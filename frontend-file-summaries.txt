@@ -1,0 +1,23 @@
+{
+  "frontend/src/App.tsx": "Root application component that sets up providers (Theme, QueryClient, InternetIdentity) and renders MainApp with Toaster for notifications.",
+  "frontend/src/components/MainApp.tsx": "Main application logic component that handles authentication state, profile setup flow, and renders appropriate screens (Login, ProfileSetup, or Dashboard) with Header and Footer.",
+  "frontend/src/components/Header.tsx": "Application header displaying the IASA logo with updated branding text and user profile dropdown showing squad role badge along with three scorecards and logout functionality.",
+  "frontend/src/components/Footer.tsx": "Footer component displaying copyright, attribution to caffeine.ai with heart icon, and version identifier \"IASA Challenge (Alpha Sandbox) v0.3\".",
+  "frontend/src/components/LoginScreen.tsx": "Landing page for unauthenticated users featuring the new IASA logo from external URL, updated title \"IASA Challenge (Alpha Sandbox) v0.3\", feature highlights with icons, and Internet Identity login button.",
+  "frontend/src/components/ProfileSetupModal.tsx": "Modal dialog for first-time users to create their profile with username, optional profile picture, and squad role selection (Apprentice, Journeyman, Mentor), initializing reputation at 3.0 stars.",
+  "frontend/src/components/Dashboard.tsx": "Main dashboard with three scorecard metrics (Earned HH, Reputation, Enabler Points) and tabbed interface for viewing projects filtered by status (all, pledging, active, completed).",
+  "frontend/src/components/ProjectsTab.tsx": "Displays filtered list of projects in a responsive grid layout with loading and empty states.",
+  "frontend/src/components/ProjectCard.tsx": "Card component showing project summary with status badge, pledge progress bar, prize money, payout per HH, participant count, and view details button.",
+  "frontend/src/components/CreateProjectDialog.tsx": "Dialog form for creating new projects with title, description, estimated HH, monetary value, and optional resource link with validation.",
+  "frontend/src/components/ProjectDetailsDialog.tsx": "Comprehensive project details modal with governance note, stats, pledge progress, resource link, and tabbed sections for tasks, pledges, share of pool payouts, and peer ratings.",
+  "frontend/src/components/PledgeSection.tsx": "Section for pledging HH to projects and viewing participant list with squad role badges displayed for each participant.",
+  "frontend/src/components/TasksSection.tsx": "Displays project tasks in a list with create task button for participants and complete project button for creators.",
+  "frontend/src/components/TaskCard.tsx": "Card showing task details with status badge, HH budget, dependencies count, and action buttons (accept, complete, approve, challenge) based on user role and task state.",
+  "frontend/src/components/CreateTaskDialog.tsx": "Dialog form for creating tasks with title, description, HH budget, and validation against remaining project budget.",
+  "frontend/src/components/CompleteProjectButton.tsx": "Button component for project creators to mark projects as completed, triggering the 7-day peer rating window.",
+  "frontend/src/components/PeerRatingSection.tsx": "Interface for rating project participants with 5-star system, displaying squad roles in participant selection and rating history, with note about Mentor ratings carrying 3x weight.",
+  "frontend/src/hooks/useQueries.ts": "Custom React Query hooks for all backend operations including new useGetUserProfile hook for fetching any user's profile by principal, with proper cache invalidation.",
+  "frontend/src/index.css": "Global styles with OKLCH color system defining design tokens for light and dark modes with purple/cyan accent colors.",
+  "frontend/index.html": "HTML entry point with updated page title to \"IASA Challenge (Alpha Sandbox) v0.3\" and favicon pointing to the new IASA logo URL.",
+  "frontend/src/components/ShareOfPoolSection.tsx": "New component displaying projected payout distribution based on earned HH, showing each participant's share percentage and payout amount in CLP with squad role badges."
+}

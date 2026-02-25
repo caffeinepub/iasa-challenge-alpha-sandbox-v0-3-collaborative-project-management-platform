@@ -1,0 +1,92 @@
+import { useState } from 'react';
+import { useGetCallerUserProfile, useGetProjects } from '../hooks/useQueries';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Zap, Star, Award } from 'lucide-react';
+import ProjectsTab from './ProjectsTab';
+import CreateProjectDialog from './CreateProjectDialog';
+
+export default function Dashboard() {
+  const { data: userProfile } = useGetCallerUserProfile();
+  const { data: projects = [] } = useGetProjects();
+  const [activeTab, setActiveTab] = useState('all');
+
+  const pledgingProjects = projects.filter((p) => p.status === 'pledging');
+  const activeProjects = projects.filter((p) => p.status === 'active');
+  const completedProjects = projects.filter((p) => p.status === 'completed');
+
+  return (
+    <div className="container py-8">
+      {/* Three Scorecards */}
+      <div className="mb-8 grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">My Earned HH</CardTitle>
+            <Zap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{userProfile?.totalEarnedHH.toFixed(1) || '0.0'}</div>
+            <p className="text-xs text-muted-foreground">Economic Potential</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">My Reputation</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {userProfile?.overallReputationScore.toFixed(2) || '3.00'} ★
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Voting Power: {userProfile?.votingPower.toFixed(2) || '9.00'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">My Enabler Points</CardTitle>
+            <Award className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">C-Score (Coming Soon)</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Projects Section */}
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Projects</h2>
+        <CreateProjectDialog />
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="all">All ({projects.length})</TabsTrigger>
+          <TabsTrigger value="pledging">Pledging ({pledgingProjects.length})</TabsTrigger>
+          <TabsTrigger value="active">Active ({activeProjects.length})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({completedProjects.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-6">
+          <ProjectsTab projects={projects} />
+        </TabsContent>
+
+        <TabsContent value="pledging" className="mt-6">
+          <ProjectsTab projects={pledgingProjects} />
+        </TabsContent>
+
+        <TabsContent value="active" className="mt-6">
+          <ProjectsTab projects={activeProjects} />
+        </TabsContent>
+
+        <TabsContent value="completed" className="mt-6">
+          <ProjectsTab projects={completedProjects} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
