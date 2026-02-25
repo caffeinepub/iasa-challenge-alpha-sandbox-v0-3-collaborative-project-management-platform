@@ -7,8 +7,10 @@ import Float "mo:base/Float";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
+
 import Migration "migration";
 
+// Add migration reference here
 (with migration = Migration.run)
 actor IASAChallenge {
   let accessControlState = AccessControl.initState();
@@ -29,6 +31,7 @@ actor IASAChallenge {
     AccessControl.isAdmin(accessControlState, caller);
   };
 
+  // Use variant as type
   public type SquadRole = {
     #Apprentice;
     #Journeyman;
@@ -43,8 +46,12 @@ actor IASAChallenge {
     overallReputationScore : Float;
     votingPower : Float;
     squadRole : SquadRole;
+    totalEnablerPoints : Nat;
+    efficiencyBadgesCount : Nat;
+    constructivenessRating : Float;
   };
 
+  // Map project and task status types (unchanged)
   public type ProjectStatus = {
     #pledging;
     #active;
@@ -117,9 +124,11 @@ actor IASAChallenge {
     timestamp : Time.Time;
   };
 
+  // Use transient OrderedMap for Principals
   transient let principalMap = OrderedMap.Make<Principal>(Principal.compare);
   transient let natMap = OrderedMap.Make<Nat>(func(a : Nat, b : Nat) : { #less; #equal; #greater } { if (a < b) #less else if (a == b) #equal else #greater });
 
+  // Make userProfiles a var for now (will delete and replace in migration)
   var userProfiles = principalMap.empty<UserProfile>();
   var projects = natMap.empty<Project>();
   var tasks = natMap.empty<Task>();
@@ -201,6 +210,9 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
+      Debug.trap("Unauthorized: Can only view your own profile");
+    };
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Debug.trap("Unauthorized: Only authenticated users can view profiles");
     };
@@ -212,6 +224,33 @@ actor IASAChallenge {
       Debug.trap("Unauthorized: Only users can save profiles");
     };
     userProfiles := principalMap.put(userProfiles, caller, profile);
+  };
+
+  // Implement registerUser as update function
+  // Requires #user permission: the caller must have been assigned a user role first
+  public shared ({ caller }) func registerUser(username : Text, role : SquadRole) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can register a profile");
+    };
+    // Error if already registered
+    switch (principalMap.get(userProfiles, caller)) {
+      case (?_) { Debug.trap("User already registered") };
+      case null {
+        let newProfile : UserProfile = {
+          friendlyUsername = username;
+          profilePicture = "";
+          totalPledgedHH = 0.0;
+          totalEarnedHH = 0.0;
+          overallReputationScore = 0.0;
+          votingPower = 0.0;
+          squadRole = role;
+          totalEnablerPoints = 0;
+          efficiencyBadgesCount = 0;
+          constructivenessRating = 0.0;
+        };
+        userProfiles := principalMap.put(userProfiles, caller, newProfile);
+      };
+    };
   };
 
   public shared ({ caller }) func createProject(title : Text, description : Text, estimatedTotalHH : Float, finalMonetaryValue : Float, sharedResourceLink : ?Text) : async Nat {
@@ -843,4 +882,3 @@ actor IASAChallenge {
     Array.filter<Challenge>(allChallenges, func(challenge) { challenge.taskId == taskId });
   };
 };
-

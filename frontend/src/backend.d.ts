@@ -49,7 +49,10 @@ export interface UserProfile {
     totalPledgedHH: number;
     votingPower: number;
     friendlyUsername: string;
+    efficiencyBadgesCount: bigint;
     squadRole: SquadRole;
+    constructivenessRating: number;
+    totalEnablerPoints: bigint;
     totalEarnedHH: number;
     profilePicture: string;
     overallReputationScore: number;
@@ -118,6 +121,7 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     pledgeHH(projectId: bigint, pledgedHH: number): Promise<void>;
     ratePeer(ratee: Principal, projectId: bigint, rating: number): Promise<void>;
+    registerUser(username: string, role: SquadRole): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     vote(targetId: bigint, voteType: Variant_finalPrize_challenge_taskProposal): Promise<void>;
 }

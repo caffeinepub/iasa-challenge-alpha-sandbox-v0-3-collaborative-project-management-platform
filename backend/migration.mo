@@ -1,152 +1,185 @@
 import OrderedMap "mo:base/OrderedMap";
-import Principal "mo:base/Principal";
+import Iter "mo:base/Iter";
+import Nat "mo:base/Nat";
+import PrincipalLib "mo:base/Principal";
+import Float "mo:base/Float";
 
 module {
-  // Old UserProfile type without the squadRole field
-  type OldUserProfile = {
-    friendlyUsername : Text;
-    profilePicture : Text;
-    totalPledgedHH : Float;
-    totalEarnedHH : Float;
-    overallReputationScore : Float;
-    votingPower : Float;
-  };
-
-  // New SquadRole and UserProfile types with the squadRole field
-  public type SquadRole = {
+  // Type from old code
+  type OldSquadRole = {
     #Apprentice;
     #Journeyman;
     #Mentor;
   };
 
-  public type UserProfile = {
+  // Type from old code
+  type OldUserProfile = {
     friendlyUsername : Text;
     profilePicture : Text;
-    totalPledgedHH : Float;
-    totalEarnedHH : Float;
-    overallReputationScore : Float;
-    votingPower : Float;
-    squadRole : SquadRole;
+    totalPledgedHH : Float.Float;
+    totalEarnedHH : Float.Float;
+    overallReputationScore : Float.Float;
+    votingPower : Float.Float;
+    squadRole : OldSquadRole;
   };
 
-  // Extended OldState and NewState types to include all state variables
-  type OldState = {
-    var userProfiles : OrderedMap.Map<Principal, OldUserProfile>;
-    // Add all other state variables with their original types here
-    var projects : OrderedMap.Map<Nat, Project>;
-    var tasks : OrderedMap.Map<Nat, Task>;
-    var pledges : OrderedMap.Map<Nat, Pledge>;
-    var votes : OrderedMap.Map<Nat, Vote>;
-    var challenges : OrderedMap.Map<Nat, Challenge>;
-    var peerRatings : OrderedMap.Map<Nat, PeerRating>;
-    var nextProjectId : Nat;
-    var nextTaskId : Nat;
-    var nextPledgeId : Nat;
-    var nextVoteId : Nat;
-    var nextChallengeId : Nat;
-    var nextRatingId : Nat;
+  // Type from old code
+  type OldProjectStatus = {
+    #pledging;
+    #active;
+    #completed;
+    #archived;
   };
 
-  type NewState = {
-    var userProfiles : OrderedMap.Map<Principal, UserProfile>;
-    // Add all other state variables with their new types here
-    var projects : OrderedMap.Map<Nat, Project>;
-    var tasks : OrderedMap.Map<Nat, Task>;
-    var pledges : OrderedMap.Map<Nat, Pledge>;
-    var votes : OrderedMap.Map<Nat, Vote>;
-    var challenges : OrderedMap.Map<Nat, Challenge>;
-    var peerRatings : OrderedMap.Map<Nat, PeerRating>;
-    var nextProjectId : Nat;
-    var nextTaskId : Nat;
-    var nextPledgeId : Nat;
-    var nextVoteId : Nat;
-    var nextChallengeId : Nat;
-    var nextRatingId : Nat;
-  };
-
-  // Migration function updated for full state transformation
-  public func run(oldState : OldState) : NewState {
-    let principalMap = OrderedMap.Make<Principal>(Principal.compare);
-    let userProfiles = principalMap.map<OldUserProfile, UserProfile>(
-      oldState.userProfiles,
-      func(_principal, oldProfile) {
-        { oldProfile with squadRole = #Apprentice };
-      },
-    );
-
-    // Directly map all other state variables without changes
-    {
-      var userProfiles;
-      var projects = oldState.projects;
-      var tasks = oldState.tasks;
-      var pledges = oldState.pledges;
-      var votes = oldState.votes;
-      var challenges = oldState.challenges;
-      var peerRatings = oldState.peerRatings;
-      var nextProjectId = oldState.nextProjectId;
-      var nextTaskId = oldState.nextTaskId;
-      var nextPledgeId = oldState.nextPledgeId;
-      var nextVoteId = oldState.nextVoteId;
-      var nextChallengeId = oldState.nextChallengeId;
-      var nextRatingId = oldState.nextRatingId;
-    };
-  };
-
-  // Types for other state variables (should match your existing definitions)
-  type Project = {
+  // Type from old code
+  type OldProject = {
     id : Nat;
     title : Text;
     description : Text;
-    estimatedTotalHH : Float;
-    finalMonetaryValue : Float;
+    estimatedTotalHH : Float.Float;
+    finalMonetaryValue : Float.Float;
     sharedResourceLink : ?Text;
-    status : { #pledging; #active; #completed; #archived };
-    totalPledgedHH : Float;
-    creator : Principal;
-    participants : [Principal];
+    status : OldProjectStatus;
+    totalPledgedHH : Float.Float;
+    creator : PrincipalLib.Principal;
+    participants : [PrincipalLib.Principal];
     completionTime : ?Int;
   };
 
-  type Task = {
+  // Type from old code
+  type OldTaskStatus = {
+    #proposed;
+    #active;
+    #inProgress;
+    #inAudit;
+    #completed;
+    #rejected;
+  };
+
+  // Type from old code
+  type OldTask = {
     id : Nat;
     projectId : Nat;
     title : Text;
     description : Text;
-    hhBudget : Float;
+    hhBudget : Float.Float;
     dependencies : [Nat];
-    status : { #proposed; #active; #inProgress; #inAudit; #completed; #rejected };
-    assignee : ?Principal;
+    status : OldTaskStatus;
+    assignee : ?PrincipalLib.Principal;
     completionTime : ?Int;
     auditStartTime : ?Int;
   };
 
-  type Pledge = {
-    user : Principal;
+  // Type from old code
+  type OldPledge = {
+    user : PrincipalLib.Principal;
     projectId : Nat;
-    pledgedHH : Float;
+    pledgedHH : Float.Float;
   };
 
-  type Vote = {
-    voter : Principal;
+  // Type from old code
+  type OldVote = {
+    voter : PrincipalLib.Principal;
     targetId : Nat;
-    weight : Float;
+    weight : Float.Float;
     voteType : { #taskProposal; #challenge; #finalPrize };
     timestamp : Int;
   };
 
-  type Challenge = {
-    challenger : Principal;
+  // Type from old code
+  type OldChallenge = {
+    challenger : PrincipalLib.Principal;
     taskId : Nat;
-    stakeHH : Float;
+    stakeHH : Float.Float;
     timestamp : Int;
   };
 
-  type PeerRating = {
-    rater : Principal;
-    ratee : Principal;
+  // Type from old code
+  type OldPeerRating = {
+    rater : PrincipalLib.Principal;
+    ratee : PrincipalLib.Principal;
     projectId : Nat;
-    rating : Float;
+    rating : Float.Float;
     timestamp : Int;
+  };
+
+  // Old actor type referencing the original variables
+  type OldActor = {
+    var userProfiles : OrderedMap.Map<PrincipalLib.Principal, OldUserProfile>;
+    var projects : OrderedMap.Map<Nat, OldProject>;
+    var tasks : OrderedMap.Map<Nat, OldTask>;
+    var pledges : OrderedMap.Map<Nat, OldPledge>;
+    var votes : OrderedMap.Map<Nat, OldVote>;
+    var challenges : OrderedMap.Map<Nat, OldChallenge>;
+    var peerRatings : OrderedMap.Map<Nat, OldPeerRating>;
+    var nextProjectId : Nat;
+    var nextTaskId : Nat;
+    var nextPledgeId : Nat;
+    var nextVoteId : Nat;
+    var nextChallengeId : Nat;
+    var nextRatingId : Nat;
+  };
+
+  // New user profile type - copied from new code
+  type NewUserProfile = {
+    friendlyUsername : Text;
+    profilePicture : Text;
+    totalPledgedHH : Float.Float;
+    totalEarnedHH : Float.Float;
+    overallReputationScore : Float.Float;
+    votingPower : Float.Float;
+    squadRole : OldSquadRole;
+    totalEnablerPoints : Nat;
+    efficiencyBadgesCount : Nat;
+    constructivenessRating : Float.Float;
+  };
+
+  // New actor type referencing the new variables and fields
+  type NewActor = {
+    var userProfiles : OrderedMap.Map<PrincipalLib.Principal, NewUserProfile>;
+    var projects : OrderedMap.Map<Nat, OldProject>;
+    var tasks : OrderedMap.Map<Nat, OldTask>;
+    var pledges : OrderedMap.Map<Nat, OldPledge>;
+    var votes : OrderedMap.Map<Nat, OldVote>;
+    var challenges : OrderedMap.Map<Nat, OldChallenge>;
+    var peerRatings : OrderedMap.Map<Nat, OldPeerRating>;
+    var nextProjectId : Nat;
+    var nextTaskId : Nat;
+    var nextPledgeId : Nat;
+    var nextVoteId : Nat;
+    var nextChallengeId : Nat;
+    var nextRatingId : Nat;
+  };
+
+  // Migration function called by the main actor via the with-clause
+  public func run(old : OldActor) : NewActor {
+    let principalMap = OrderedMap.Make<PrincipalLib.Principal>(PrincipalLib.compare);
+    let newUserProfiles = principalMap.map<OldUserProfile, NewUserProfile>(
+      old.userProfiles,
+      func(_key, value) {
+        {
+          value with
+          totalEnablerPoints = 0;
+          efficiencyBadgesCount = 0;
+          constructivenessRating = 0.0;
+        };
+      },
+    );
+
+    {
+      var userProfiles = newUserProfiles;
+      var projects = old.projects;
+      var tasks = old.tasks;
+      var pledges = old.pledges;
+      var votes = old.votes;
+      var challenges = old.challenges;
+      var peerRatings = old.peerRatings;
+      var nextProjectId = old.nextProjectId;
+      var nextTaskId = old.nextTaskId;
+      var nextPledgeId = old.nextPledgeId;
+      var nextVoteId = old.nextVoteId;
+      var nextChallengeId = old.nextChallengeId;
+      var nextRatingId = old.nextRatingId;
+    };
   };
 };
-

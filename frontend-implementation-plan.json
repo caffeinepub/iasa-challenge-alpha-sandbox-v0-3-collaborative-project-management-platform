@@ -1,0 +1,33 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Add SquadRole, UserProfile types, orthogonal persistence, registerUser and getUserProfile to existing IASA Challenge backend",
+  "requirements": [
+    {
+      "id": "REQ-6",
+      "summary": "Update ProfileSetupModal to pass selected SquadRole variant when calling registerUser",
+      "acceptanceCriteria": [
+        "ProfileSetupModal submits the correct SquadRole variant to the registerUser backend function.",
+        "All three role options (Apprentice, Journeyman, Mentor) are selectable.",
+        "The modal compiles and renders without TypeScript errors."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/ProfileSetupModal.tsx",
+          "operation": "modify",
+          "description": "Update the ProfileSetupModal component to call the new registerUser(username: string, role: SquadRole) backend capability instead of saveCallerUserProfile. Pass the selected SquadRole variant (#Apprentice, #Journeyman, or #Mentor) when submitting the form. Ensure the role selection UI includes all three role options and maps them correctly to the backend SquadRole enum variants. Remove or adjust the profilePicture field handling since registerUser initializes all profile fields with defaults. After successful registration, refetch the user profile to populate the UI with the newly created profile data."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add a useRegisterUser mutation hook that wraps the registerUser(username: string, role: SquadRole) backend capability. The hook should accept username and role as parameters, call actor.registerUser with these values, handle success/error states, and invalidate the 'currentUserProfile' query on success to trigger a profile refetch. Ensure the SquadRole type from backend.d.ts is used correctly."
+        },
+        {
+          "path": "frontend/src/backend.d.ts",
+          "operation": "modify",
+          "description": "Verify that the UserProfile interface includes all nine required fields: friendlyUsername (string), squadRole (SquadRole), totalPledgedHH (number), totalEarnedHH (number), totalEnablerPoints (bigint), overallReputationScore (number), votingPower (number), efficiencyBadgesCount (bigint), and constructivenessRating (number). Verify that the SquadRole enum includes Apprentice, Journeyman, and Mentor variants. Verify that registerUser(username: string, role: SquadRole): Promise<void> is present in the backendInterface. This file is auto-generated, so no manual edits are needed—this operation confirms the interface matches the updated backend actor."
+        }
+      ]
+    }
+  ]
+}

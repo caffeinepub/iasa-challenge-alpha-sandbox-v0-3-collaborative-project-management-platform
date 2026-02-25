@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 3,
+  "summary": "Building 'IASA Challenge Sandbox' — a decentralized DAO and collaborative project management platform on the Internet Computer Protocol (ICP), implemented in Motoko. Development is proceeding in 4 incremental steps, starting with core data structures and user profile management.",
+  "architectural_notes": [
+    "Platform: Internet Computer Protocol (ICP), backend in Motoko actor class",
+    "Orthogonal persistence via stable data structures (StableBTreeMap or stable key-value pairs)",
+    "VotingPower calculated dynamically as OverallReputationScore^2",
+    "Squad roles: Apprentice, Journeyman, Mentor (S1=Project Lead, S2=Mentor, S3=Administrator, S5=Arbitrator)",
+    "Project activation requires TotalPledgedHH >= EstimatedTotalHH AND manual S3 sign-off",
+    "Mentor reputation scores locked at fixed high value for the 30-week duration",
+    "Active signer registry hierarchy only updates after a Quality Gate"
+  ],
+  "known_issues": [
+    "Previous full-spec single-prompt build failed (too complex); using 4-step incremental approach instead"
+  ],
+  "isFixRequest": false,
+  "existing_features": [
+    {
+      "id": "feature-update-the-frontend-profile-setup-modal-profilesetupmodal-tsx-to-pass-the-selected-squadrole-variant-apprentice-journeyman-or-mentor-when-calling-registeruser-ensuring-the-role-selection-aligns-with-the-new-squadrole-type-defined-in-the-backend",
+      "title": "Update the frontend profile setup modal (ProfileSetupModal.tsx) to pass the selected SquadRole variant (#Apprentice, #Journeyman, or #Mentor) when calling registerUser, ensuring the role selection aligns with the new SquadRole type defined in the backend.",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Step 1: Core data structures, orthogonal persistence, SquadRole variant, UserProfile record, registerUser and getUserProfile functions",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Step 2 (planned): Project management logic — Title, EstimatedTotalHH, FinalMonetaryValue, TotalPledgedHH, Status, activation function (#pledging -> #active), S3 admin sign-off",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Step 3 (planned): Task & Sprint logic — 14-day fixed sprints, task fields (HH_Budget, HH_Actual, BasedOnContributionID, DependsOnTaskID), 2-of-3 sign-off by Project Lead (S1) and Assigned Mentor (S2)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Step 4 (planned): Quality Gates, Arbitration, Economy & Reputation — 30-week global timer, gates at weeks 4/16/24/28, 48-72hr cooling-off challenge, Arbitrator (S5) routing, Efficiency Badges, Stewardship Flag, locked Mentor rep, active signer registry updates post-gate",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Task generation feature — previously missing from Version 4, needs to be added",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Define a SquadRole variant type with three constructors: #Apprentice, #Journeyman, and #Mentor in the backend actor.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Define a UserProfile record type containing the following fields: FriendlyUsername (Text), SquadRole (SquadRole), TotalPledgedHH (Nat), TotalEarnedHH (Nat), TotalEnablerPoints (Nat), OverallReputationScore (Float), VotingPower (Float), EfficiencyBadgesCount (Nat), ConstructivenessRating (Float). Ensure this type is compatible with the existing UserProfile record already present in the actor, merging or extending it rather than replacing any fields currently used by existing functions.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-8",
+      "summary": "Implement stable (orthogonally persistent) state storage for user profiles by mapping each user's ICP Principal to their UserProfile. Use a stable variable — either a stable array of (Principal, UserProfile) pairs or a compatible stable data structure — to ensure state survives canister upgrades. Integrate this storage with the existing actor state without removing existing stable variables.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-9",
+      "summary": "Implement a shared update function registerUser(username: Text, role: SquadRole) that creates a new UserProfile for the calling principal with FriendlyUsername set to username, SquadRole set to role, all numeric fields (TotalPledgedHH, TotalEarnedHH, TotalEnablerPoints, EfficiencyBadgesCount) initialized to 0, all Float fields (OverallReputationScore, ConstructivenessRating) initialized to 0.0, and VotingPower automatically calculated as OverallReputationScore * OverallReputationScore (i.e., 0.0 * 0.0 = 0.0 at registration). The function should persist the new profile in the stable user storage. If a profile already exists for the caller, return an appropriate error rather than overwriting.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-10",
+      "summary": "Implement a shared query function getUserProfile() that retrieves and returns the UserProfile for the calling principal from stable storage. Return a Result or optional type indicating not-found if no profile exists for the caller.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "status": "pending"
+    }
+  ],
+  "gameProjectType": "none",
+  "projectName": "IASA Challenge Sandbox",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}

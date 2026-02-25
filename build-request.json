@@ -1,0 +1,132 @@
+{
+  "kind": "build_request",
+  "title": "Add SquadRole, UserProfile types, orthogonal persistence, registerUser and getUserProfile to existing IASA Challenge backend",
+  "projectName": "IASA Challenge Sandbox",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Define a SquadRole variant type with three constructors: #Apprentice, #Journeyman, and #Mentor in the backend actor.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-20"
+        ],
+        "quotes": [
+          "Define a variant for SquadRole (Apprentice, Journeyman, Mentor)."
+        ]
+      },
+      "acceptanceCriteria": [
+        "The variant type SquadRole is declared with exactly three tags: #Apprentice, #Journeyman, #Mentor.",
+        "The type compiles without errors."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Define a UserProfile record type containing the following fields: FriendlyUsername (Text), SquadRole (SquadRole), TotalPledgedHH (Nat), TotalEarnedHH (Nat), TotalEnablerPoints (Nat), OverallReputationScore (Float), VotingPower (Float), EfficiencyBadgesCount (Nat), ConstructivenessRating (Float). Ensure this type is compatible with the existing UserProfile record already present in the actor, merging or extending it rather than replacing any fields currently used by existing functions.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-20"
+        ],
+        "quotes": [
+          "Create a UserProfile data structure containing: FriendlyUsername (Text), SquadRole (SquadRole), TotalPledgedHH (Nat), TotalEarnedHH (Nat), TotalEnablerPoints (Nat), OverallReputationScore (Float), VotingPower (Float), EfficiencyBadgesCount (Nat), ConstructivenessRating (Float)"
+        ]
+      },
+      "acceptanceCriteria": [
+        "UserProfile record includes all nine specified fields with correct types.",
+        "Existing fields used by current actor functions are preserved.",
+        "Code compiles without type errors."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Implement stable (orthogonally persistent) state storage for user profiles by mapping each user's ICP Principal to their UserProfile. Use a stable variable — either a stable array of (Principal, UserProfile) pairs or a compatible stable data structure — to ensure state survives canister upgrades. Integrate this storage with the existing actor state without removing existing stable variables.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-20"
+        ],
+        "quotes": [
+          "Implement orthogonal persistence using a stable data structure (e.g., StableBTreeMap or an array of key-value pairs) to store users, mapping their ICP Principal to their UserProfile."
+        ]
+      },
+      "acceptanceCriteria": [
+        "User profiles are stored in a stable variable that persists across upgrades.",
+        "The storage maps Principal to UserProfile.",
+        "Existing stable variables in the actor are not removed or broken."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Implement a shared update function registerUser(username: Text, role: SquadRole) that creates a new UserProfile for the calling principal with FriendlyUsername set to username, SquadRole set to role, all numeric fields (TotalPledgedHH, TotalEarnedHH, TotalEnablerPoints, EfficiencyBadgesCount) initialized to 0, all Float fields (OverallReputationScore, ConstructivenessRating) initialized to 0.0, and VotingPower automatically calculated as OverallReputationScore * OverallReputationScore (i.e., 0.0 * 0.0 = 0.0 at registration). The function should persist the new profile in the stable user storage. If a profile already exists for the caller, return an appropriate error rather than overwriting.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-20"
+        ],
+        "quotes": [
+          "Write a registerUser(username: Text, role: SquadRole) function that initializes a new profile for the caller with default zero values for all scores/hours, automatically calculating VotingPower as OverallReputationScore * OverallReputationScore, and saves it to the persistent state."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Calling registerUser creates a profile with all zero/0.0 defaults.",
+        "VotingPower is set to OverallReputationScore squared at registration.",
+        "The profile is persisted in stable storage keyed by the caller's Principal.",
+        "Calling registerUser a second time with the same Principal returns an error and does not overwrite the existing profile."
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Implement a shared query function getUserProfile() that retrieves and returns the UserProfile for the calling principal from stable storage. Return a Result or optional type indicating not-found if no profile exists for the caller.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-20"
+        ],
+        "quotes": [
+          "Write a getUserProfile() query function for the caller to retrieve their data."
+        ]
+      },
+      "acceptanceCriteria": [
+        "The function is marked as a query call.",
+        "Returns the correct UserProfile for the caller's Principal.",
+        "Returns a not-found indicator when no profile exists for the caller."
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "text": "Update the frontend profile setup modal (ProfileSetupModal.tsx) to pass the selected SquadRole variant (#Apprentice, #Journeyman, or #Mentor) when calling registerUser, ensuring the role selection aligns with the new SquadRole type defined in the backend.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-20"
+        ],
+        "quotes": [
+          "ADD THAT OR ANY OF ITS COMPONENTS IF MISSING, TO THE EXISTING IASA CHALLENGE APP"
+        ]
+      },
+      "acceptanceCriteria": [
+        "ProfileSetupModal submits the correct SquadRole variant to the registerUser backend function.",
+        "All three role options (Apprentice, Journeyman, Mentor) are selectable.",
+        "The modal compiles and renders without TypeScript errors."
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not remove or break any existing stable variables, data types, or functions already present in backend/main.mo.",
+    "Do not implement project management, task, sprint, voting, quality gate, arbitration, or economy logic in this step.",
+    "All Motoko logic must remain in the single actor file backend/main.mo.",
+    "Do not edit files listed in frontend.immutablePaths."
+  ],
+  "nonGoals": [
+    "Project creation or management logic (Step 2).",
+    "Task and sprint logic (Step 3).",
+    "Quality gates, arbitration, economy, reputation locking, or Efficiency Badge logic (Step 4).",
+    "Any changes to authentication or Internet Identity integration."
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-25T23:49:35.273Z",
+  "summary": "The diff implements most of the required functionality. REQ-1 (SquadRole variant), REQ-2 (UserProfile record with new fields), REQ-3 (stable storage via migration), REQ-4 (registerUser function), REQ-5 (getUserProfile query), and REQ-6 (ProfileSetupModal updates) are all addressed. However, there are concerns about REQ-2 field naming conventions, REQ-3 stable variable evidence, REQ-4 duplicate registration error handling, and REQ-5 query function naming.",
+  "missing_requirements": [
+    {
+      "id": "REQ-2",
+      "requirement": "UserProfile record fields must use the exact names specified: FriendlyUsername, SquadRole, TotalPledgedHH, TotalEarnedHH, TotalEnablerPoints, OverallReputationScore, VotingPower, EfficiencyBadgesCount, ConstructivenessRating (PascalCase).",
+      "reason": "The diff shows field names in camelCase (friendlyUsername, totalPledgedHH, squadRole, etc.) rather than the PascalCase names specified in the requirements. While this may be an acceptable Motoko convention, the AC specifies exact field names.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "requirement": "State storage must use a stable variable (stable keyword) to ensure persistence across canister upgrades.",
+      "reason": "The diff shows var userProfiles = principalMap.empty<UserProfile>() without the stable keyword. OrderedMap is not natively stable in Motoko without explicit stable keyword or stable array backing, so persistence across upgrades is not confirmed.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "requirement": "Implement a shared query function getUserProfile() that retrieves and returns the UserProfile for the calling principal from stable storage, returning a not-found indicator when no profile exists.",
+      "reason": "The frontend hooks reference getCallerUserProfile() rather than getUserProfile(), and the truncated backend does not confirm a query function named getUserProfile() with no arguments returning a Result or optional type for the caller.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts",
+        "backend/main.mo"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "A separate migration.mo module was added to handle data migration between old and new UserProfile types.",
+      "reason": "The build request constraints state all Motoko logic must remain in the single actor file backend/main.mo. A separate migration module was not requested and violates this constraint.",
+      "evidence": [
+        "backend/migration.mo"
+      ]
+    },
+    {
+      "description": "useGetUserProfile hook accepting a Principal parameter for looking up arbitrary users profiles was added.",
+      "reason": "REQ-5 only specifies a getUserProfile function for the calling principal. No requirement asks for fetching other users profiles by Principal.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    },
+    {
+      "description": "useSaveCallerUserProfile mutation hook calling actor.saveCallerUserProfile was added.",
+      "reason": "No requirement in the build request asks for a saveCallerUserProfile function or corresponding frontend hook.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    }
+  ],
+  "confidence": 0.62,
+  "changed_files": [
+    "backend/main.mo",
+    "backend/migration.mo",
+    "frontend-file-summaries.txt",
+    "frontend/src/components/ProfileSetupModal.tsx",
+    "frontend/src/hooks/useActor.ts",
+    "frontend/src/hooks/useInternetIdentity.ts",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/main.tsx",
+    "project_state.json"
+  ]
+}

@@ -137,7 +137,7 @@
   },
   "ContextMenu": {
     "import": "@/components/ui/context-menu",
-    "desc": "Displays a menu to the user — such as a set of actions or functions — triggered by a button.",
+    "desc": "Displays a menu to the user â such as a set of actions or functions â triggered by a button.",
     "exports": [
       "ContextMenu",
       "ContextMenuTrigger",
@@ -193,7 +193,7 @@
   },
   "DropdownMenu": {
     "import": "@/components/ui/dropdown-menu",
-    "desc": "Displays a menu to the user — such as a set of actions or functions — triggered by a button.",
+    "desc": "Displays a menu to the user â such as a set of actions or functions â triggered by a button.",
     "exports": [
       "DropdownMenu",
       "DropdownMenuPortal",
@@ -313,7 +313,7 @@
   },
   "RadioGroup": {
     "import": "@/components/ui/radio-group",
-    "desc": "A set of checkable buttons—known as radio buttons—where no more than one of the buttons can be checked at a time.",
+    "desc": "A set of checkable buttonsâknown as radio buttonsâwhere no more than one of the buttons can be checked at a time.",
     "exports": ["RadioGroup", "RadioGroupItem"]
   },
   "Resizable": {
@@ -328,7 +328,7 @@
   },
   "Select": {
     "import": "@/components/ui/select",
-    "desc": "Displays a list of options for the user to pick from—triggered by a button.",
+    "desc": "Displays a list of options for the user to pick fromâtriggered by a button.",
     "exports": [
       "Select",
       "SelectContent",
@@ -435,7 +435,7 @@
   },
   "Tabs": {
     "import": "@/components/ui/tabs",
-    "desc": "A set of layered sections of content—known as tab panels—that are displayed one at a time.",
+    "desc": "A set of layered sections of contentâknown as tab panelsâthat are displayed one at a time.",
     "exports": ["Tabs", "TabsList", "TabsTrigger", "TabsContent"],
     "asChildExports": ["TabsTrigger"]
   },

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
-import { UserProfile, Project, Task, Pledge, PeerRating, Variant_finalPrize_challenge_taskProposal } from '../backend';
+import { UserProfile, Project, Task, Pledge, PeerRating, SquadRole } from '../backend';
 import { Principal } from '@icp-sdk/core/principal';
 
 // User Profile Queries
@@ -46,6 +46,21 @@ export function useSaveCallerUserProfile() {
     mutationFn: async (profile: UserProfile) => {
       if (!actor) throw new Error('Actor not available');
       return actor.saveCallerUserProfile(profile);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+    },
+  });
+}
+
+export function useRegisterUser() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { username: string; role: SquadRole }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.registerUser(params.username, params.role);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });

@@ -29,8 +29,10 @@ export async function loadConfig(): Promise<Config> {
         return configCache;
     }
     const backendCanisterId = process.env.CANISTER_ID_BACKEND;
+    const envBaseUrl = process.env.BASE_URL || '/';
+    const baseUrl = envBaseUrl.endsWith('/') ? envBaseUrl : `${envBaseUrl}/`;
     try {
-        const response = await fetch('./env.json');
+        const response = await fetch(`${baseUrl}env.json`);
         const config = (await response.json()) as JsonConfig;
         if (!backendCanisterId && config.backend_canister_id === 'undefined') {
             console.error('CANISTER_ID_BACKEND is not set');
@@ -68,7 +70,7 @@ export async function loadConfig(): Promise<Config> {
 
 function extractAgentErrorMessage(error: string): string {
     const errorString = String(error);
-    const match = errorString.match(/with message:\s*'([^']+)'/s);
+    const match = errorString.match(/with message:\s*'([^'].+)'\./s);
     return match ? match[1] : errorString;
 }
 

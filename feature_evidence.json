@@ -1,0 +1,25 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-update-the-frontend-profile-setup-modal-profilesetupmodal-tsx-to-pass-the-selected-squadrole-variant-apprentice-journeyman-or-mentor-when-calling-registeruser-ensuring-the-role-selection-aligns-with-the-new-squadrole-type-defined-in-the-backend",
+      "featureTitle": "Update the frontend profile setup modal (ProfileSetupModal.tsx) to pass the selected SquadRole variant (#Apprentice, #Journeyman, or #Mentor) when calling registerUser, ensuring the role selection aligns with the new SquadRole type defined in the backend.",
+      "files": [
+        "frontend/src/components/ProfileSetupModal.tsx",
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@1.0.1",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-6"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

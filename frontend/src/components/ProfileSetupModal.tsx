@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSaveCallerUserProfile } from '../hooks/useQueries';
+import { useRegisterUser } from '../hooks/useQueries';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,8 @@ import { toast } from 'sonner';
 
 export default function ProfileSetupModal() {
   const [username, setUsername] = useState('');
-  const [profilePicture, setProfilePicture] = useState('');
   const [squadRole, setSquadRole] = useState<SquadRole>(SquadRole.Apprentice);
-  const saveProfile = useSaveCallerUserProfile();
+  const registerUser = useRegisterUser();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,14 +22,9 @@ export default function ProfileSetupModal() {
     }
 
     try {
-      await saveProfile.mutateAsync({
-        friendlyUsername: username.trim(),
-        profilePicture: profilePicture.trim() || `https://api.dicebear.com/7.x/initials/svg?seed=${username}`,
-        totalPledgedHH: 0,
-        totalEarnedHH: 0,
-        overallReputationScore: 3.0,
-        votingPower: 9.0,
-        squadRole: squadRole,
+      await registerUser.mutateAsync({
+        username: username.trim(),
+        role: squadRole,
       });
       toast.success('Profile created successfully!');
     } catch (error: any) {
@@ -44,7 +38,7 @@ export default function ProfileSetupModal() {
         <DialogHeader>
           <DialogTitle>Welcome to IASA Challenge!</DialogTitle>
           <DialogDescription>
-            Please set up your profile to get started.
+            Please set up your profile to get started. All scores begin at zero and grow through your contributions.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -55,28 +49,15 @@ export default function ProfileSetupModal() {
               placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              disabled={saveProfile.isPending}
+              disabled={registerUser.isPending}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="profilePicture">Profile Picture URL (optional)</Label>
-            <Input
-              id="profilePicture"
-              placeholder="https://example.com/avatar.jpg"
-              value={profilePicture}
-              onChange={(e) => setProfilePicture(e.target.value)}
-              disabled={saveProfile.isPending}
-            />
-            <p className="text-xs text-muted-foreground">
-              Leave empty to use a default avatar
-            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="squadRole">Squad Role *</Label>
-            <Select 
-              value={squadRole} 
+            <Select
+              value={squadRole}
               onValueChange={(value) => setSquadRole(value as SquadRole)}
-              disabled={saveProfile.isPending}
+              disabled={registerUser.isPending}
             >
               <SelectTrigger id="squadRole">
                 <SelectValue placeholder="Select your squad role" />
@@ -91,8 +72,8 @@ export default function ProfileSetupModal() {
               Mentor ratings carry 3x weight in reputation calculations
             </p>
           </div>
-          <Button type="submit" className="w-full" disabled={saveProfile.isPending}>
-            {saveProfile.isPending ? 'Creating Profile...' : 'Create Profile'}
+          <Button type="submit" className="w-full" disabled={registerUser.isPending}>
+            {registerUser.isPending ? 'Creating Profile...' : 'Create Profile'}
           </Button>
         </form>
       </DialogContent>
