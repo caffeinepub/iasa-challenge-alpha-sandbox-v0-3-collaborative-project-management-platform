@@ -92,16 +92,37 @@ export interface Vote {
   'targetId' : bigint,
 }
 export interface _SERVICE {
+  /**
+   * / Accept (self-assign) a task. Requires #user role and project participation.
+   */
   'acceptTask' : ActorMethod<[bigint], undefined>,
+  /**
+   * / Approve a task after the audit window. Requires #user role; caller must be project creator or admin.
+   */
   'approveTask' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  /**
+   * / Challenge a task during its audit window. Requires #user role and project participation.
+   */
   'challengeTask' : ActorMethod<[bigint, number], undefined>,
+  /**
+   * / Complete a project. Requires #user role; caller must be project creator or admin.
+   */
   'completeProject' : ActorMethod<[bigint], undefined>,
+  /**
+   * / Mark a task as complete (moves to audit). Requires #user role; caller must be assignee.
+   */
   'completeTask' : ActorMethod<[bigint], undefined>,
+  /**
+   * / Create a new project. Requires #user role.
+   */
   'createProject' : ActorMethod<
     [string, string, number, number, [] | [string]],
     bigint
   >,
+  /**
+   * / Create a task within a project. Requires #user role and project participation.
+   */
   'createTask' : ActorMethod<
     [bigint, string, string, number, Array<bigint>],
     bigint
@@ -117,10 +138,22 @@ export interface _SERVICE {
   'getVotes' : ActorMethod<[bigint], Array<Vote>>,
   'initializeAccessControl' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  /**
+   * / Pledge hours to a project. Requires #user role.
+   */
   'pledgeHH' : ActorMethod<[bigint, number], undefined>,
+  /**
+   * / Submit a peer rating. Requires #user role and project participation.
+   */
   'ratePeer' : ActorMethod<[Principal, bigint, number], undefined>,
+  /**
+   * / Register the calling principal as a participant. Requires #user role.
+   */
   'registerUser' : ActorMethod<[string, SquadRole], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  /**
+   * / Cast a vote. Requires #user role and relevant project participation.
+   */
   'vote' : ActorMethod<
     [
       bigint,

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "projectStateVersion": 3,
+  "projectStateVersion": 5,
   "summary": "Building 'IASA Challenge Sandbox' — a decentralized DAO and collaborative project management platform on the Internet Computer Protocol (ICP), implemented in Motoko. Development is proceeding in 4 incremental steps, starting with core data structures and user profile management.",
   "architectural_notes": [
     "Platform: Internet Computer Protocol (ICP), backend in Motoko actor class",
@@ -9,18 +9,28 @@
     "Squad roles: Apprentice, Journeyman, Mentor (S1=Project Lead, S2=Mentor, S3=Administrator, S5=Arbitrator)",
     "Project activation requires TotalPledgedHH >= EstimatedTotalHH AND manual S3 sign-off",
     "Mentor reputation scores locked at fixed high value for the 30-week duration",
-    "Active signer registry hierarchy only updates after a Quality Gate"
+    "Active signer registry hierarchy only updates after a Quality Gate",
+    "Participant identity: actor should validate or restrict callers to recognized grupo.iasa.cl principals; access control policy TBD"
   ],
   "known_issues": [
-    "Previous full-spec single-prompt build failed (too complex); using 4-step incremental approach instead"
+    "Previous full-spec single-prompt build failed (too complex); using 4-step incremental approach instead",
+    "Actor validity issue reported — participant identity/access control not yet defined or enforced"
   ],
-  "isFixRequest": false,
+  "isFixRequest": true,
   "existing_features": [
     {
       "id": "feature-update-the-frontend-profile-setup-modal-profilesetupmodal-tsx-to-pass-the-selected-squadrole-variant-apprentice-journeyman-or-mentor-when-calling-registeruser-ensuring-the-role-selection-aligns-with-the-new-squadrole-type-defined-in-the-backend",
       "title": "Update the frontend profile setup modal (ProfileSetupModal.tsx) to pass the selected SquadRole variant (#Apprentice, #Journeyman, or #Mentor) when calling registerUser, ensuring the role selection aligns with the new SquadRole type defined in the backend.",
       "reqIds": [
         "REQ-6"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-mainapp-tsx-to-call-the-isparticipant-query-after-a-user-authenticates-via-internet-identity-if-the-authenticated-principal-is-not-in-the-allowlist-display-a-clear-user-friendly-message-e-g-your-identity-is-not-yet-authorized-for-this-platform-please-contact-the-iasa-administrator-instead-of-rendering-the-profilesetupmodal-or-dashboard-do-not-block-the-login-flow-itself-only-gate-the-post-login-content",
+      "title": "Update `MainApp.tsx` to call the `isParticipant` query after a user authenticates via Internet Identity. If the authenticated principal is not in the allowlist, display a clear, user-friendly message (e.g., 'Your identity is not yet authorized for this platform. Please contact the IASA administrator.') instead of rendering the `ProfileSetupModal` or `Dashboard`. Do not block the login flow itself — only gate the post-login content.",
+      "reqIds": [
+        "REQ-8"
       ],
       "version": 1
     }
@@ -93,6 +103,20 @@
       "summary": "Implement a shared query function getUserProfile() that retrieves and returns the UserProfile for the calling principal from stable storage. Return a Result or optional type indicating not-found if no profile exists for the caller.",
       "reqIds": [
         "REQ-5"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-11",
+      "summary": "Define and enforce participant identity — clarify who is allowed to interact with the actor (e.g., all grupo.iasa.cl IDs or a specific allowlist), and implement access control or identity validation accordingly.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-12",
+      "summary": "Define a stable allowlist of authorized participant principals in the backend actor. Provide an initial seed mechanism (e.g., a stable variable `authorizedPrincipals: [Principal]` or a `TrieSet`/`HashMap` of trusted principals) so that only recognized ICP identities associated with grupo.iasa.cl can call state-mutating functions such as `registerUser`, `createProject`, `pledgeHours`, `createTask`, `completeTask`, and `submitPeerRating`. Callers not in the allowlist must receive a `#Unauthorized` or descriptive error variant rather than a trap.",
+      "reqIds": [
+        "REQ-7"
       ],
       "status": "pending"
     }

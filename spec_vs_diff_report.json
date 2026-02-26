@@ -1,68 +1,92 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-25T23:49:35.273Z",
-  "summary": "The diff implements most of the required functionality. REQ-1 (SquadRole variant), REQ-2 (UserProfile record with new fields), REQ-3 (stable storage via migration), REQ-4 (registerUser function), REQ-5 (getUserProfile query), and REQ-6 (ProfileSetupModal updates) are all addressed. However, there are concerns about REQ-2 field naming conventions, REQ-3 stable variable evidence, REQ-4 duplicate registration error handling, and REQ-5 query function naming.",
+  "generatedAt": "2026-02-26T00:06:32.623Z",
+  "summary": "The diff implements a role-based access control system via an AccessControl module in the backend and an UnauthorizedScreen component in the frontend. REQ-8 is largely satisfied. REQ-7 has partial coverage but several acceptance criteria are not clearly met or are missing.",
   "missing_requirements": [
     {
-      "id": "REQ-2",
-      "requirement": "UserProfile record fields must use the exact names specified: FriendlyUsername, SquadRole, TotalPledgedHH, TotalEarnedHH, TotalEnablerPoints, OverallReputationScore, VotingPower, EfficiencyBadgesCount, ConstructivenessRating (PascalCase).",
-      "reason": "The diff shows field names in camelCase (friendlyUsername, totalPledgedHH, squadRole, etc.) rather than the PascalCase names specified in the requirements. While this may be an acceptable Motoko convention, the AC specifies exact field names.",
+      "id": "REQ-7",
+      "requirement": "A stable data structure (e.g., `allowedPrincipals`) is declared in the actor and survives upgrades.",
+      "reason": "The diff imports an AccessControl module and calls AccessControl.initState(), but the actual stable variable declaration inside the access-control module is not shown. The authorization/access-control module is not included in the diff. There is no evidence of a stable var for the allowlist in the visible code.",
       "evidence": [
         "backend/main.mo"
       ]
     },
     {
-      "id": "REQ-3",
-      "requirement": "State storage must use a stable variable (stable keyword) to ensure persistence across canister upgrades.",
-      "reason": "The diff shows var userProfiles = principalMap.empty<UserProfile>() without the stable keyword. OrderedMap is not natively stable in Motoko without explicit stable keyword or stable array backing, so persistence across upgrades is not confirmed.",
+      "id": "REQ-7",
+      "requirement": "An admin-only addParticipant(p: Principal) and removeParticipant(p: Principal) function exist so authorized principals can be managed at runtime.",
+      "reason": "The diff shows assignCallerUserRole which is a generic role assignment function, but no explicit addParticipant or removeParticipant functions are visible. These are distinct from generic role assignment and are required by the AC.",
       "evidence": [
         "backend/main.mo"
       ]
     },
     {
-      "id": "REQ-5",
-      "requirement": "Implement a shared query function getUserProfile() that retrieves and returns the UserProfile for the calling principal from stable storage, returning a not-found indicator when no profile exists.",
-      "reason": "The frontend hooks reference getCallerUserProfile() rather than getUserProfile(), and the truncated backend does not confirm a query function named getUserProfile() with no arguments returning a Result or optional type for the caller.",
+      "id": "REQ-7",
+      "requirement": "The actor has an initial deployer/admin principal hardcoded or set during preupgrade/postupgrade so the allowlist is never empty on first deploy.",
+      "reason": "The diff shows an initializeAccessControl() function that must be called explicitly after deploy, rather than automatically setting the deployer as admin during deploy or in preupgrade/postupgrade. This means the allowlist could be empty until initializeAccessControl is manually called.",
       "evidence": [
-        "frontend/src/hooks/useQueries.ts",
         "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "requirement": "Every state-mutating public function checks membership in the allowlist and returns an error (not a trap) for unauthorized callers.",
+      "reason": "The visible requireUser helper uses Debug.trap(...) for unauthorized callers, which is explicitly prohibited by the build constraints. The build request requires a Result or variant error, never an uncaught trap.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-7",
+      "requirement": "A public query isParticipant(p: Principal): Bool is exposed so the frontend can check eligibility before showing the registration flow.",
+      "reason": "The diff does not show an isParticipant(p: Principal): Bool query function. Instead, getCallerUserRole() is used on the frontend to infer participant status. The required named query function is absent from the visible backend code.",
+      "evidence": [
+        "backend/main.mo",
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    },
+    {
+      "id": "REQ-8",
+      "requirement": "After login, isParticipant is called with the authenticated principal.",
+      "reason": "The frontend calls getCallerUserRole() instead of isParticipant(principal). While functionally equivalent for gating, the AC specifically requires calling isParticipant with the authenticated principal.",
+      "evidence": [
+        "frontend/src/components/MainApp.tsx",
+        "frontend/src/hooks/useQueries.ts"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "A separate migration.mo module was added to handle data migration between old and new UserProfile types.",
-      "reason": "The build request constraints state all Motoko logic must remain in the single actor file backend/main.mo. A separate migration module was not requested and violates this constraint.",
+      "description": "A role-based access control system with distinct UserRole levels (guest, user, admin) implemented via a separate AccessControl module, replacing a simple allowlist with a full role hierarchy.",
+      "reason": "The build request specifies a simple allowlist of authorized principals with admin management, not a multi-tier role system. The implementation adds a full UserRole type, getCallerUserRole, assignCallerUserRole, isCallerAdmin, and an AccessControl module, none of which were requested.",
       "evidence": [
-        "backend/migration.mo"
+        "backend/main.mo",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/components/MainApp.tsx"
       ]
     },
     {
-      "description": "useGetUserProfile hook accepting a Principal parameter for looking up arbitrary users profiles was added.",
-      "reason": "REQ-5 only specifies a getUserProfile function for the calling principal. No requirement asks for fetching other users profiles by Principal.",
+      "description": "An initializeAccessControl() public shared function that must be explicitly called post-deploy to set up the admin.",
+      "reason": "The build request requires automatic admin initialization hardcoded or via pre/postupgrade, not a manually-invoked public function.",
       "evidence": [
-        "frontend/src/hooks/useQueries.ts"
+        "backend/main.mo"
       ]
     },
     {
-      "description": "useSaveCallerUserProfile mutation hook calling actor.saveCallerUserProfile was added.",
-      "reason": "No requirement in the build request asks for a saveCallerUserProfile function or corresponding frontend hook.",
+      "description": "Display of the user's principal ID in the UnauthorizedScreen and a link to grupo.iasa.cl for contact.",
+      "reason": "The build request only requires a clear message mentioning contacting the IASA administrator. Displaying the principal ID and a clickable link to grupo.iasa.cl are additional features not specified.",
       "evidence": [
-        "frontend/src/hooks/useQueries.ts"
+        "frontend/src/components/UnauthorizedScreen.tsx"
       ]
     }
   ],
-  "confidence": 0.62,
+  "confidence": 0.72,
   "changed_files": [
     "backend/main.mo",
-    "backend/migration.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/ProfileSetupModal.tsx",
-    "frontend/src/hooks/useActor.ts",
-    "frontend/src/hooks/useInternetIdentity.ts",
+    "frontend/src/components/MainApp.tsx",
+    "frontend/src/components/UnauthorizedScreen.tsx",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/main.tsx",
     "project_state.json"
   ]
 }

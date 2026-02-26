@@ -2,10 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-frontend-profile-setup-modal-profilesetupmodal-tsx-to-pass-the-selected-squadrole-variant-apprentice-journeyman-or-mentor-when-calling-registeruser-ensuring-the-role-selection-aligns-with-the-new-squadrole-type-defined-in-the-backend",
-      "featureTitle": "Update the frontend profile setup modal (ProfileSetupModal.tsx) to pass the selected SquadRole variant (#Apprentice, #Journeyman, or #Mentor) when calling registerUser, ensuring the role selection aligns with the new SquadRole type defined in the backend.",
+      "featureId": "feature-update-mainapp-tsx-to-call-the-isparticipant-query-after-a-user-authenticates-via-internet-identity-if-the-authenticated-principal-is-not-in-the-allowlist-display-a-clear-user-friendly-message-e-g-your-identity-is-not-yet-authorized-for-this-platform-please-contact-the-iasa-administrator-instead-of-rendering-the-profilesetupmodal-or-dashboard-do-not-block-the-login-flow-itself-only-gate-the-post-login-content",
+      "featureTitle": "Update `MainApp.tsx` to call the `isParticipant` query after a user authenticates via Internet Identity. If the authenticated principal is not in the allowlist, display a clear, user-friendly message (e.g., 'Your identity is not yet authorized for this platform. Please contact the IASA administrator.') instead of rendering the `ProfileSetupModal` or `Dashboard`. Do not block the login flow itself — only gate the post-login content.",
       "files": [
-        "frontend/src/components/ProfileSetupModal.tsx",
+        "frontend/src/components/MainApp.tsx",
+        "frontend/src/components/UnauthorizedScreen.tsx",
         "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
@@ -17,7 +18,7 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-6"
+        "REQ-8"
       ],
       "confidence": "high"
     }

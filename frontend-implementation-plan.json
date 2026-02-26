@@ -1,31 +1,33 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Add SquadRole, UserProfile types, orthogonal persistence, registerUser and getUserProfile to existing IASA Challenge backend",
+  "title": "Define and enforce participant identity / access control",
   "requirements": [
     {
-      "id": "REQ-6",
-      "summary": "Update ProfileSetupModal to pass selected SquadRole variant when calling registerUser",
+      "id": "REQ-8",
+      "summary": "Check participant allowlist after authentication and show authorization status to user",
       "acceptanceCriteria": [
-        "ProfileSetupModal submits the correct SquadRole variant to the registerUser backend function.",
-        "All three role options (Apprentice, Journeyman, Mentor) are selectable.",
-        "The modal compiles and renders without TypeScript errors."
+        "After login, `isParticipant` is called with the authenticated principal.",
+        "If `isParticipant` returns `false`, a dedicated 'Not Authorized' screen or inline message is shown instead of the app shell.",
+        "If `isParticipant` returns `true`, the existing flow (ProfileSetupModal or Dashboard) continues unchanged.",
+        "The unauthorized message is clear, professional, and mentions contacting an administrator.",
+        "Loading state is handled gracefully while the `isParticipant` query is in flight."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/ProfileSetupModal.tsx",
+          "path": "frontend/src/components/MainApp.tsx",
           "operation": "modify",
-          "description": "Update the ProfileSetupModal component to call the new registerUser(username: string, role: SquadRole) backend capability instead of saveCallerUserProfile. Pass the selected SquadRole variant (#Apprentice, #Journeyman, or #Mentor) when submitting the form. Ensure the role selection UI includes all three role options and maps them correctly to the backend SquadRole enum variants. Remove or adjust the profilePicture field handling since registerUser initializes all profile fields with defaults. After successful registration, refetch the user profile to populate the UI with the newly created profile data."
+          "description": "Add a call to `isParticipant` query after authentication. If the query returns `false`, render an UnauthorizedScreen component instead of ProfileSetupModal or Dashboard. Ensure proper loading state handling while the `isParticipant` check is in flight. The existing authentication flow and ProfileSetupModal logic remain unchanged when the user is authorized."
+        },
+        {
+          "path": "frontend/src/components/UnauthorizedScreen.tsx",
+          "operation": "create",
+          "description": "Create a new component that displays a clear, professional message when an authenticated user is not in the participant allowlist. The message should state 'Your identity is not yet authorized for this platform. Please contact the IASA administrator.' and include the IASA logo from `frontend/public/assets/generated/iasa-logo-transparent.dim_200x200.png`. Use Tailwind styling consistent with LoginScreen component. Include a logout button so unauthorized users can switch identities."
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a useRegisterUser mutation hook that wraps the registerUser(username: string, role: SquadRole) backend capability. The hook should accept username and role as parameters, call actor.registerUser with these values, handle success/error states, and invalidate the 'currentUserProfile' query on success to trigger a profile refetch. Ensure the SquadRole type from backend.d.ts is used correctly."
-        },
-        {
-          "path": "frontend/src/backend.d.ts",
-          "operation": "modify",
-          "description": "Verify that the UserProfile interface includes all nine required fields: friendlyUsername (string), squadRole (SquadRole), totalPledgedHH (number), totalEarnedHH (number), totalEnablerPoints (bigint), overallReputationScore (number), votingPower (number), efficiencyBadgesCount (bigint), and constructivenessRating (number). Verify that the SquadRole enum includes Apprentice, Journeyman, and Mentor variants. Verify that registerUser(username: string, role: SquadRole): Promise<void> is present in the backendInterface. This file is auto-generated, so no manual edits are needed—this operation confirms the interface matches the updated backend actor."
+          "description": "Add a new `useIsParticipant` query hook that calls the backend `isParticipant` method with the authenticated principal. The hook should be enabled only when the actor is available and the user is authenticated. Return loading, error, and data states. Use the same pattern as other query hooks in this file for consistency."
         }
       ]
     }

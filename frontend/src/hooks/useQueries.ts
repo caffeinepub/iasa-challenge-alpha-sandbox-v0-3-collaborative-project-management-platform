@@ -1,7 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
-import { UserProfile, Project, Task, Pledge, PeerRating, SquadRole } from '../backend';
+import { UserProfile, Project, Task, Pledge, PeerRating, SquadRole, UserRole } from '../backend';
 import { Principal } from '@icp-sdk/core/principal';
+import { useInternetIdentity } from './useInternetIdentity';
+
+// User Role / Participant Check
+export function useGetCallerUserRole() {
+  const { actor, isFetching: actorFetching } = useActor();
+  const { identity } = useInternetIdentity();
+
+  const query = useQuery<UserRole>({
+    queryKey: ['callerUserRole'],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.getCallerUserRole();
+    },
+    enabled: !!actor && !actorFetching && !!identity,
+    retry: false,
+  });
+
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+    isFetched: !!actor && query.isFetched,
+  };
+}
 
 // User Profile Queries
 export function useGetCallerUserProfile() {

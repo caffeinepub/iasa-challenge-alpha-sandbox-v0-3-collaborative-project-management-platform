@@ -1,6 +1,6 @@
 {
   "frontend/src/App.tsx": "Root application component that sets up providers (Theme, QueryClient, InternetIdentity) and renders MainApp with Toaster for notifications.",
-  "frontend/src/components/MainApp.tsx": "Main application logic component that handles authentication state, profile setup flow, and renders appropriate screens (Login, ProfileSetup, or Dashboard) with Header and Footer.",
+  "frontend/src/components/MainApp.tsx": "Main application logic component that now checks the caller's role via `useGetCallerUserRole` after authentication; renders `UnauthorizedScreen` for guest-role users, a loading spinner while the role check is in flight, and the existing Dashboard/ProfileSetupModal flow for authorized participants.",
   "frontend/src/components/Header.tsx": "Application header displaying the IASA logo with updated branding text and user profile dropdown showing squad role badge along with three scorecards and logout functionality.",
   "frontend/src/components/Footer.tsx": "Footer component displaying copyright, attribution to caffeine.ai with heart icon, and version identifier \"IASA Challenge (Alpha Sandbox) v0.3\".",
   "frontend/src/components/LoginScreen.tsx": "Landing page for unauthenticated users featuring the new IASA logo from external URL, updated title \"IASA Challenge (Alpha Sandbox) v0.3\", feature highlights with icons, and Internet Identity login button.",
@@ -16,8 +16,9 @@
   "frontend/src/components/CreateTaskDialog.tsx": "Dialog form for creating tasks with title, description, HH budget, and validation against remaining project budget.",
   "frontend/src/components/CompleteProjectButton.tsx": "Button component for project creators to mark projects as completed, triggering the 7-day peer rating window.",
   "frontend/src/components/PeerRatingSection.tsx": "Interface for rating project participants with 5-star system, displaying squad roles in participant selection and rating history, with note about Mentor ratings carrying 3x weight.",
-  "frontend/src/hooks/useQueries.ts": "Custom React Query hooks for all backend operations, now including a `useRegisterUser` mutation hook that calls `actor.registerUser(username, role)` and invalidates the `currentUserProfile` cache on success. Imports `SquadRole` from the backend interface instead of `Variant_finalPrize_challenge_taskProposal` (which is no longer needed at the top-level import).",
+  "frontend/src/hooks/useQueries.ts": "Custom React Query hooks for all backend operations, now including a `useGetCallerUserRole` hook that calls `actor.getCallerUserRole()` to check if the authenticated user has a participant-level role (`user` or `admin`).",
   "frontend/src/index.css": "Global styles with OKLCH color system defining design tokens for light and dark modes with purple/cyan accent colors.",
   "frontend/index.html": "HTML entry point with updated page title to \"IASA Challenge (Alpha Sandbox) v0.3\" and favicon pointing to the new IASA logo URL.",
-  "frontend/src/components/ShareOfPoolSection.tsx": "New component displaying projected payout distribution based on earned HH, showing each participant's share percentage and payout amount in CLP with squad role badges."
+  "frontend/src/components/ShareOfPoolSection.tsx": "New component displaying projected payout distribution based on earned HH, showing each participant's share percentage and payout amount in CLP with squad role badges.",
+  "frontend/src/components/UnauthorizedScreen.tsx": "New component shown when an authenticated user's principal is not in the participant allowlist; displays the IASA logo, a clear Spanish-language unauthorized message, the user's principal ID (for sharing with the admin), a grupo.iasa.cl contact link, and a logout button."
 }

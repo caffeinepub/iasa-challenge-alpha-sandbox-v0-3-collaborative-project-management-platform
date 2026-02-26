@@ -8,10 +8,6 @@ import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
 
-import Migration "migration";
-
-// Add migration reference here
-(with migration = Migration.run)
 actor IASAChallenge {
   let accessControlState = AccessControl.initState();
 
@@ -24,6 +20,7 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func assignCallerUserRole(user : Principal, role : AccessControl.UserRole) : async () {
+    // Admin-only check happens inside AccessControl.assignRole
     AccessControl.assignRole(accessControlState, caller, user, role);
   };
 
@@ -31,7 +28,6 @@ actor IASAChallenge {
     AccessControl.isAdmin(accessControlState, caller);
   };
 
-  // Use variant as type
   public type SquadRole = {
     #Apprentice;
     #Journeyman;
@@ -51,7 +47,6 @@ actor IASAChallenge {
     constructivenessRating : Float;
   };
 
-  // Map project and task status types (unchanged)
   public type ProjectStatus = {
     #pledging;
     #active;
@@ -124,11 +119,11 @@ actor IASAChallenge {
     timestamp : Time.Time;
   };
 
-  // Use transient OrderedMap for Principals
   transient let principalMap = OrderedMap.Make<Principal>(Principal.compare);
-  transient let natMap = OrderedMap.Make<Nat>(func(a : Nat, b : Nat) : { #less; #equal; #greater } { if (a < b) #less else if (a == b) #equal else #greater });
+  transient let natMap = OrderedMap.Make<Nat>(func(a : Nat, b : Nat) : { #less; #equal; #greater } {
+    if (a < b) #less else if (a == b) #equal else #greater
+  });
 
-  // Make userProfiles a var for now (will delete and replace in migration)
   var userProfiles = principalMap.empty<UserProfile>();
   var projects = natMap.empty<Project>();
   var tasks = natMap.empty<Task>();
@@ -144,7 +139,24 @@ actor IASAChallenge {
   var nextChallengeId = 0;
   var nextRatingId = 0;
 
-  // Helper function to check if user is project participant
+  // ── Authorization helpers ────────────────────────────────────────────────
+
+  /// Require the caller to have at least the #user role (blocks anonymous/guest callers).
+  private func requireUser(caller : Principal) {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Debug.trap("Unauthorized: Only registered users can perform this action");
+    };
+  };
+
+  /// Require the caller to have the #admin role.
+  private func requireAdmin(caller : Principal) {
+    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Debug.trap("Unauthorized: Only admins can perform this action");
+    };
+  };
+
+  // ── Internal helpers ─────────────────────────────────────────────────────
+
   private func isProjectParticipant(projectId : Nat, user : Principal) : Bool {
     switch (natMap.get(projects, projectId)) {
       case null { false };
@@ -155,7 +167,6 @@ actor IASAChallenge {
     };
   };
 
-  // Helper function to check if user has already voted
   private func hasAlreadyVoted(voter : Principal, targetId : Nat, voteType : { #taskProposal; #challenge; #finalPrize }) : Bool {
     let allVotes = Iter.toArray(natMap.vals(votes));
     Array.find<Vote>(
@@ -166,23 +177,17 @@ actor IASAChallenge {
     ) != null;
   };
 
-  // Helper function to get total HH budget used in project
   private func getTotalTaskBudget(projectId : Nat) : Float {
     let projectTasks = Iter.toArray(natMap.vals(tasks));
     Array.foldLeft<Task, Float>(
       projectTasks,
       0.0,
       func(acc, task) {
-        if (task.projectId == projectId) {
-          acc + task.hhBudget;
-        } else {
-          acc;
-        };
+        if (task.projectId == projectId) { acc + task.hhBudget } else { acc };
       },
     );
   };
 
-  // Helper function to check if user has already rated another user in a project
   private func hasAlreadyRated(rater : Principal, ratee : Principal, projectId : Nat) : Bool {
     let allRatings = Iter.toArray(natMap.vals(peerRatings));
     Array.find<PeerRating>(
@@ -193,18 +198,16 @@ actor IASAChallenge {
     ) != null;
   };
 
-  // Helper function to check if there are active challenges for a task
   private func hasActiveChallenges(taskId : Nat) : Bool {
     let allChallenges = Iter.toArray(natMap.vals(challenges));
-    Array.find<Challenge>(
-      allChallenges,
-      func(c) { c.taskId == taskId },
-    ) != null;
+    Array.find<Challenge>(allChallenges, func(c) { c.taskId == taskId }) != null;
   };
 
+  // ── User profile functions ───────────────────────────────────────────────
+
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can access profiles");
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Debug.trap("Unauthorized: Only users can view profiles");
     };
     principalMap.get(userProfiles, caller);
   };
@@ -213,26 +216,21 @@ actor IASAChallenge {
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
       Debug.trap("Unauthorized: Can only view your own profile");
     };
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only authenticated users can view profiles");
-    };
     principalMap.get(userProfiles, user);
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
       Debug.trap("Unauthorized: Only users can save profiles");
     };
     userProfiles := principalMap.put(userProfiles, caller, profile);
   };
 
-  // Implement registerUser as update function
-  // Requires #user permission: the caller must have been assigned a user role first
+  // ── Application functions ────────────────────────────────────────────────
+
+  /// Register the calling principal as a participant. Requires #user role.
   public shared ({ caller }) func registerUser(username : Text, role : SquadRole) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can register a profile");
-    };
-    // Error if already registered
+    requireUser(caller);
     switch (principalMap.get(userProfiles, caller)) {
       case (?_) { Debug.trap("User already registered") };
       case null {
@@ -253,15 +251,19 @@ actor IASAChallenge {
     };
   };
 
-  public shared ({ caller }) func createProject(title : Text, description : Text, estimatedTotalHH : Float, finalMonetaryValue : Float, sharedResourceLink : ?Text) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can create projects");
-    };
+  /// Create a new project. Requires #user role.
+  public shared ({ caller }) func createProject(
+    title : Text,
+    description : Text,
+    estimatedTotalHH : Float,
+    finalMonetaryValue : Float,
+    sharedResourceLink : ?Text,
+  ) : async Nat {
+    requireUser(caller);
 
     if (estimatedTotalHH <= 0.0) {
       Debug.trap("Invalid: Estimated total HH must be positive");
     };
-
     if (finalMonetaryValue < 0.0) {
       Debug.trap("Invalid: Final monetary value cannot be negative");
     };
@@ -287,10 +289,9 @@ actor IASAChallenge {
     projectId;
   };
 
+  /// Pledge hours to a project. Requires #user role.
   public shared ({ caller }) func pledgeHH(projectId : Nat, pledgedHH : Float) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can pledge HH");
-    };
+    requireUser(caller);
 
     if (pledgedHH <= 0.0) {
       Debug.trap("Invalid: Pledged HH must be positive");
@@ -333,7 +334,7 @@ actor IASAChallenge {
         };
 
         switch (principalMap.get(userProfiles, caller)) {
-          case null { };
+          case null {};
           case (?profile) {
             let updatedProfile = {
               profile with
@@ -346,10 +347,15 @@ actor IASAChallenge {
     };
   };
 
-  public shared ({ caller }) func createTask(projectId : Nat, title : Text, description : Text, hhBudget : Float, dependencies : [Nat]) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can create tasks");
-    };
+  /// Create a task within a project. Requires #user role and project participation.
+  public shared ({ caller }) func createTask(
+    projectId : Nat,
+    title : Text,
+    description : Text,
+    hhBudget : Float,
+    dependencies : [Nat],
+  ) : async Nat {
+    requireUser(caller);
 
     if (hhBudget <= 0.0) {
       Debug.trap("Invalid: Task HH budget must be positive");
@@ -404,10 +410,9 @@ actor IASAChallenge {
     };
   };
 
+  /// Accept (self-assign) a task. Requires #user role and project participation.
   public shared ({ caller }) func acceptTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can accept tasks");
-    };
+    requireUser(caller);
 
     switch (natMap.get(tasks, taskId)) {
       case null { Debug.trap("Task not found") };
@@ -426,7 +431,7 @@ actor IASAChallenge {
               Debug.trap("Task is already assigned to another user");
             };
           };
-          case null { };
+          case null {};
         };
 
         for (depId in task.dependencies.vals()) {
@@ -451,10 +456,9 @@ actor IASAChallenge {
     };
   };
 
+  /// Mark a task as complete (moves to audit). Requires #user role; caller must be assignee.
   public shared ({ caller }) func completeTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can complete tasks");
-    };
+    requireUser(caller);
 
     switch (natMap.get(tasks, taskId)) {
       case null { Debug.trap("Task not found") };
@@ -484,10 +488,9 @@ actor IASAChallenge {
     };
   };
 
+  /// Approve a task after the audit window. Requires #user role; caller must be project creator or admin.
   public shared ({ caller }) func approveTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can approve tasks");
-    };
+    requireUser(caller);
 
     switch (natMap.get(tasks, taskId)) {
       case null { Debug.trap("Task not found") };
@@ -531,10 +534,10 @@ actor IASAChallenge {
         tasks := natMap.put(tasks, taskId, updatedTask);
 
         switch (task.assignee) {
-          case null { };
+          case null {};
           case (?assignee) {
             switch (principalMap.get(userProfiles, assignee)) {
-              case null { };
+              case null {};
               case (?profile) {
                 let updatedProfile = {
                   profile with
@@ -549,10 +552,9 @@ actor IASAChallenge {
     };
   };
 
+  /// Challenge a task during its audit window. Requires #user role and project participation.
   public shared ({ caller }) func challengeTask(taskId : Nat, stakeHH : Float) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can challenge tasks");
-    };
+    requireUser(caller);
 
     if (stakeHH < 1.0) {
       Debug.trap("Invalid: Challenge requires at least 1 HH stake");
@@ -603,10 +605,12 @@ actor IASAChallenge {
     };
   };
 
-  public shared ({ caller }) func vote(targetId : Nat, voteType : { #taskProposal; #challenge; #finalPrize }) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can vote");
-    };
+  /// Cast a vote. Requires #user role and relevant project participation.
+  public shared ({ caller }) func vote(
+    targetId : Nat,
+    voteType : { #taskProposal; #challenge; #finalPrize },
+  ) : async () {
+    requireUser(caller);
 
     let voterProfile = switch (principalMap.get(userProfiles, caller)) {
       case null { Debug.trap("Voter profile not found") };
@@ -662,7 +666,7 @@ actor IASAChallenge {
     };
 
     let now = Time.now();
-    let vote : Vote = {
+    let newVote : Vote = {
       voter = caller;
       targetId;
       weight = voterProfile.votingPower;
@@ -670,14 +674,13 @@ actor IASAChallenge {
       timestamp = now;
     };
 
-    votes := natMap.put(votes, nextVoteId, vote);
+    votes := natMap.put(votes, nextVoteId, newVote);
     nextVoteId += 1;
   };
 
+  /// Submit a peer rating. Requires #user role and project participation.
   public shared ({ caller }) func ratePeer(ratee : Principal, projectId : Nat, rating : Float) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can rate peers");
-    };
+    requireUser(caller);
 
     if (caller == ratee) {
       Debug.trap("Cannot rate yourself");
@@ -775,7 +778,7 @@ actor IASAChallenge {
           };
 
           switch (principalMap.get(userProfiles, ratee)) {
-            case null { };
+            case null {};
             case (?profile) {
               let updatedProfile = {
                 profile with
@@ -790,10 +793,9 @@ actor IASAChallenge {
     };
   };
 
+  /// Complete a project. Requires #user role; caller must be project creator or admin.
   public shared ({ caller }) func completeProject(projectId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can complete projects");
-    };
+    requireUser(caller);
 
     switch (natMap.get(projects, projectId)) {
       case null { Debug.trap("Project not found") };
@@ -818,26 +820,21 @@ actor IASAChallenge {
     };
   };
 
+  // ── Query functions ──────────────────────────────────────────────────────
+
   public query ({ caller }) func getProjects() : async [Project] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view projects");
-    };
+    requireUser(caller);
     Iter.toArray(natMap.vals(projects));
   };
 
   public query ({ caller }) func getTasks(projectId : Nat) : async [Task] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view tasks");
-    };
-
+    requireUser(caller);
     let allTasks = Iter.toArray(natMap.vals(tasks));
     Array.filter<Task>(allTasks, func(task) { task.projectId == projectId });
   };
 
   public query ({ caller }) func getPledges(projectId : Nat) : async [Pledge] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view pledges");
-    };
+    requireUser(caller);
 
     let allPledges = Iter.toArray(natMap.vals(pledges));
     let projectPledges = Array.filter<Pledge>(allPledges, func(pledge) { pledge.projectId == projectId });
@@ -850,18 +847,13 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getVotes(targetId : Nat) : async [Vote] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view votes");
-    };
-
+    requireUser(caller);
     let allVotes = Iter.toArray(natMap.vals(votes));
-    Array.filter<Vote>(allVotes, func(vote) { vote.targetId == targetId });
+    Array.filter<Vote>(allVotes, func(v) { v.targetId == targetId });
   };
 
   public query ({ caller }) func getPeerRatings(projectId : Nat) : async [PeerRating] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view peer ratings");
-    };
+    requireUser(caller);
 
     let allRatings = Iter.toArray(natMap.vals(peerRatings));
     let projectRatings = Array.filter<PeerRating>(allRatings, func(rating) { rating.projectId == projectId });
@@ -874,10 +866,7 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getChallenges(taskId : Nat) : async [Challenge] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view challenges");
-    };
-
+    requireUser(caller);
     let allChallenges = Iter.toArray(natMap.vals(challenges));
     Array.filter<Challenge>(allChallenges, func(challenge) { challenge.taskId == taskId });
   };
