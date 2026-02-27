@@ -1,74 +1,75 @@
 {
   "kind": "build_request",
-  "title": "Fix actor availability error and restore previously generated project/task data",
+  "title": "Fix draft dialog and clarify task/pledge/approval lifecycle flow",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the 'actor not available' error that occurs when a user attempts to create a project. Ensure the backend actor is fully initialized and available before any mutation calls (createProject, createTask, etc.) are made from the frontend. If the actor is not yet ready, show a loading state or disabled button rather than an error.",
-      "target": "both",
+      "text": "Fix the ProjectDetailsDialog (draft view) so that it opens correctly when triggered from a ProjectCard. Investigate and resolve any rendering or state error that prevents the dialog from mounting in the current deployment.",
+      "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "it says 'actor not available' once I want to create a project"
+          "it is not working (draft does not open)"
         ]
       },
       "acceptanceCriteria": [
-        "Clicking 'Create Project' no longer produces an 'actor not available' error.",
-        "The create project button is disabled or shows a spinner while the actor is initializing.",
-        "Once the actor is ready, submitting the CreateProjectDialog successfully calls the backend and creates the project."
+        "Clicking 'Open' or the details button on any ProjectCard opens the ProjectDetailsDialog without errors.",
+        "The dialog renders all tabs (Tasks, Pledges, Share of Pool, Peer Ratings) without crashing.",
+        "The dialog opens for projects in all statuses (drafting, pledging, active, completed)."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard on login. The frontend must not ignore existing backend state — all projects and tasks stored in the canister must be retrieved and rendered correctly after authentication.",
+      "text": "In the Tasks section and TaskCard components, clearly display the sequential lifecycle conditions for a task: (1) Task is created by PM in 'open' state; (2) A participant pledges HH hours to the task (pledge status = 'pending'); (3) PM confirms the pledge (pledge status = 'confirmed'); (4) Once the task has sufficient confirmed pledges, the PM can set the task to 'inProgress'; (5) The assignee marks the task as 'completed'; (6) PM approves the task completion (task status = 'approved'). Each state transition should be visually distinct with a status badge or label.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "The draft ignores all the previous information (project, task) that was generated"
+          "simply clarify the conditions (sequence) of tasks, pledge and respective approval"
         ]
       },
       "acceptanceCriteria": [
-        "After logging in, the Dashboard displays all previously created projects from the backend.",
-        "Existing tasks within each project are visible in the ProjectDetailsDialog.",
-        "No previously stored project or task data is missing or blank after a fresh login.",
-        "React Query hooks correctly invalidate and refetch project and task data after actor initialization."
+        "Each TaskCard shows the current task status (open, inProgress, completed, approved) as a clearly labelled badge.",
+        "Action buttons on TaskCard are only shown when the task is in the correct state for that action (e.g., 'Pledge' only when task is open, 'Approve' only when task is completed).",
+        "A short inline label or tooltip on each TaskCard explains what the next required step is (e.g., 'Awaiting pledge confirmation by PM').",
+        "The task lifecycle sequence is visually readable without needing external documentation."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Ensure the useActor hook and all dependent React Query hooks (useQueries.ts) wait for the actor to be fully available before executing queries or mutations. Guard all actor-dependent query functions so they are only called when the actor instance is non-null, preventing race conditions on initial load.",
+      "text": "In the PledgeSection component, clearly display the sequential lifecycle conditions for a pledge: (1) Participant submits a pledge (status = 'pending', not counted in confirmed budget); (2) PM reviews and confirms the pledge (status = 'confirmed', now counted in HH budget and Share of Pool); (3) If not confirmed within the expiry window, pledge becomes 'expired'. Show each pledge with its current status and indicate what action is needed next (e.g., 'Awaiting PM confirmation').",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "actor not available",
-          "The draft ignores all the previous information"
+          "simply clarify the conditions (sequence) of tasks, pledge and respective approval"
         ]
       },
       "acceptanceCriteria": [
-        "All useQuery hooks that depend on the actor have enabled: !!actor guards so they do not fire before the actor is ready.",
-        "All useMutation hooks check actor availability before invoking backend calls and surface a clear UI message if the actor is unavailable.",
-        "No console errors related to null actor calls appear during normal app use."
+        "Each pledge entry in PledgeSection shows a status badge: 'Pending', 'Confirmed', or 'Expired'.",
+        "Pending pledges display a note such as 'Awaiting PM confirmation — not yet counted in budget'.",
+        "Confirmed pledges display a note such as 'Confirmed — included in HH budget and payout calculation'.",
+        "Expired pledges are visually de-emphasised and labelled 'Expired'.",
+        "PM-only confirm/reject buttons are visible only for pending pledges and only to the PM."
       ]
     }
   ],
   "constraints": [
-    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, or frontend/src/main.tsx (immutable paths).",
-    "Do not change the backend data model or existing canister state — only fix frontend actor initialization and data fetching issues.",
-    "All Motoko logic must remain in the single main actor file backend/main.mo."
+    "Do not change the backend data model or pledge/task status enumerations.",
+    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui.",
+    "All lifecycle labels and status badges must reflect actual backend state — do not introduce UI-only pseudo-states."
   ],
   "nonGoals": [
-    "Adding new features or changing existing RBAC logic.",
-    "Redesigning the UI or changing the visual theme.",
-    "Migrating or resetting canister state."
+    "Adding new backend endpoints or changing the Motoko actor logic.",
+    "Implementing auto-expiry of pledges (deferred to a future request).",
+    "Changing the overall visual theme or layout of the dashboard."
   ],
   "imageRequirements": {
     "required": [],

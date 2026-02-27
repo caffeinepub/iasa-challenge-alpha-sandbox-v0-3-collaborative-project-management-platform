@@ -1,99 +1,71 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix actor availability error and restore previously generated project/task data",
+  "title": "Fix draft dialog and clarify task/pledge/approval lifecycle flow",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix the 'actor not available' error when creating a project by ensuring the backend actor is fully initialized before mutation calls, showing a loading state or disabled button when the actor is not ready.",
+      "summary": "Fix ProjectDetailsDialog so it opens correctly when triggered from ProjectCard without rendering or state errors",
       "acceptanceCriteria": [
-        "Clicking 'Create Project' no longer produces an 'actor not available' error.",
-        "The create project button is disabled or shows a spinner while the actor is initializing.",
-        "Once the actor is ready, submitting the CreateProjectDialog successfully calls the backend and creates the project."
+        "Clicking 'Open' or the details button on any ProjectCard opens the ProjectDetailsDialog without errors.",
+        "The dialog renders all tabs (Tasks, Pledges, Share of Pool, Peer Ratings) without crashing.",
+        "The dialog opens for projects in all statuses (drafting, pledging, active, completed)."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/CreateProjectDialog.tsx",
+          "path": "frontend/src/components/ProjectDetailsDialog.tsx",
           "operation": "modify",
-          "description": "Add actor availability check from useActor hook (isFetching state) to disable the submit button and show a loading indicator while the actor is initializing. Ensure the dialog only allows submission when actor is non-null and not fetching. Add user-facing feedback (e.g., 'Connecting to backend...') when actor is unavailable."
+          "description": "Investigate and fix the dialog mounting issue. Verify the open prop is properly handled, ensure all state initialization is safe (e.g., null-check project data before rendering tabs), add error boundaries if needed, and confirm the Dialog component from shadcn/ui is correctly wired with the open state. Test that the dialog can mount for projects in all statuses without crashing."
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/components/ProjectCard.tsx",
           "operation": "modify",
-          "description": "Add actor null-check guards to the useCreateProject mutation's mutationFn to prevent execution when actor is unavailable. Throw a clear error message if actor is null at invocation time, ensuring the UI can surface this gracefully."
+          "description": "Verify the button click handler correctly sets the dialog open state and passes the correct project data to ProjectDetailsDialog. Ensure no conflicting state updates or event handlers prevent the dialog from opening."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard after login, ensuring the frontend retrieves all existing backend state correctly.",
+      "summary": "Clearly display the sequential lifecycle conditions for tasks with visually distinct status badges and action buttons that reflect the current state",
       "acceptanceCriteria": [
-        "After logging in, the Dashboard displays all previously created projects from the backend.",
-        "Existing tasks within each project are visible in the ProjectDetailsDialog.",
-        "No previously stored project or task data is missing or blank after a fresh login.",
-        "React Query hooks correctly invalidate and refetch project and task data after actor initialization."
+        "Each TaskCard shows the current task status (open, inProgress, completed, approved) as a clearly labelled badge.",
+        "Action buttons on TaskCard are only shown when the task is in the correct state for that action (e.g., 'Pledge' only when task is open, 'Approve' only when task is completed).",
+        "A short inline label or tooltip on each TaskCard explains what the next required step is (e.g., 'Awaiting pledge confirmation by PM').",
+        "The task lifecycle sequence is visually readable without needing external documentation."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/components/TaskCard.tsx",
           "operation": "modify",
-          "description": "Ensure useGetProjects query includes enabled: !!actor guard so it does not fire before the actor is ready. Verify that queryKey is stable and that the query refetches automatically when actor becomes available. Remove any stale-time or cache-time settings that might prevent fresh data fetches on login."
+          "description": "Add a prominent status badge component that maps TaskStatus enum values to user-friendly labels (e.g., 'proposed' → 'Open', 'inProgress' → 'In Progress', 'completed' → 'Completed', 'taskConfirmed' → 'Approved'). Use distinct colors for each status. Add conditional logic to show action buttons only when the task is in the correct state: show 'Pledge' only when status is 'proposed', 'Accept' only when status is 'taskConfirmed' and user is not assigned, 'Complete' only when status is 'inProgress' and user is the assignee, 'Approve' only when status is 'completed' and user is the PM, 'Confirm' only when status is 'proposed' and user is the PM. Add a next-step indicator (e.g., inline label or tooltip) that explains the required action based on the current status and role (e.g., 'Awaiting pledge confirmation by PM', 'Awaiting task acceptance', 'Awaiting completion by assignee', 'Awaiting PM approval')."
         },
         {
-          "path": "frontend/src/components/Dashboard.tsx",
+          "path": "frontend/src/components/TasksSection.tsx",
           "operation": "modify",
-          "description": "Ensure the Dashboard correctly waits for useGetProjects to fetch all projects after the actor initializes. Show a loading spinner or skeleton while projects are being fetched. Verify that the projects list is not filtered or hidden inadvertently by local state or empty checks that ignore backend data."
-        },
-        {
-          "path": "frontend/src/components/ProjectDetailsDialog.tsx",
-          "operation": "modify",
-          "description": "Ensure useGetTasks query for a given projectId includes enabled: !!actor guard and only fires when the dialog is open and actor is ready. Verify that task data refetches correctly when the dialog is opened and actor is available, displaying all existing tasks from the backend."
+          "description": "Update the budget info banner to clarify that pending pledges are not yet counted in the confirmed HH budget. Add a legend or tooltip explaining task lifecycle states if needed to support the TaskCard changes."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Ensure the useActor hook and all dependent React Query hooks wait for the actor to be fully available before executing queries or mutations, preventing race conditions on initial load.",
+      "summary": "Clearly display the sequential lifecycle conditions for pledges with status badges and next-action indicators",
       "acceptanceCriteria": [
-        "All useQuery hooks that depend on the actor have enabled: !!actor guards so they do not fire before the actor is ready.",
-        "All useMutation hooks check actor availability before invoking backend calls and surface a clear UI message if the actor is unavailable.",
-        "No console errors related to null actor calls appear during normal app use."
+        "Each pledge entry in PledgeSection shows a status badge: 'Pending', 'Confirmed', or 'Expired'.",
+        "Pending pledges display a note such as 'Awaiting PM confirmation — not yet counted in budget'.",
+        "Confirmed pledges display a note such as 'Confirmed — included in HH budget and payout calculation'.",
+        "Expired pledges are visually de-emphasised and labelled 'Expired'.",
+        "PM-only confirm/reject buttons are visible only for pending pledges and only to the PM."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Audit all useQuery hooks (useGetProjects, useGetTasks, useGetPledges, useGetPeerRatings, useGetVotes, useGetChallenges, useGetCallerUserProfile) to ensure each has enabled: !!actor && !actorFetching guards. Audit all useMutation hooks (useCreateProject, useCreateTask, usePledgeToTask, useAcceptTask, useCompleteTask, useApproveTask, useChallengeTask, useVote, useSignOffPledge, useReassignFromOtherTasks, useRatePeer, useCompleteProject, useRegisterUser, useSaveCallerUserProfile) to add actor null-checks in their mutationFn before invoking backend methods, throwing descriptive errors if actor is unavailable."
-        },
-        {
-          "path": "frontend/src/components/MainApp.tsx",
-          "operation": "modify",
-          "description": "Ensure MainApp waits for actor initialization to complete before rendering the Dashboard. Show a loading spinner or initialization message while actorFetching is true. Only render the main app UI once actor is available and authentication state is determined, preventing premature queries."
-        },
-        {
-          "path": "frontend/src/components/TaskCard.tsx",
-          "operation": "modify",
-          "description": "Add actor availability checks to all action buttons (accept, complete, approve, challenge, pledge) by checking the actor state from useActor. Disable buttons and show a tooltip or inline message when actor is not ready, preventing users from triggering mutations before the backend is available."
-        },
-        {
           "path": "frontend/src/components/PledgeSection.tsx",
           "operation": "modify",
-          "description": "Add actor availability checks to the pledge form and sign-off buttons. Disable pledge submission and sign-off actions while actor is initializing, showing user-facing feedback (e.g., 'Backend initializing...'). Ensure mutations are only triggered when actor is non-null."
+          "description": "Add a status badge component for each pledge that maps PledgeStatus enum values to user-friendly labels ('pending' → 'Pending', 'confirmed' → 'Confirmed', 'expired' → 'Expired'). Use distinct colors for each status. For pending pledges, add an inline note: 'Awaiting PM confirmation — not yet counted in budget'. For confirmed pledges, add a note: 'Confirmed — included in HH budget and payout calculation'. For expired pledges, apply a muted/greyed-out visual style and label them 'Expired'. Ensure PM-only confirm/reassign buttons are only visible for pending pledges and only to the project creator (PM). Update the section header or intro text to explain the pledge lifecycle sequence: (1) Participant submits pledge (pending), (2) PM confirms pledge (confirmed, counted in budget), (3) Expired if not confirmed in time."
         },
         {
-          "path": "frontend/src/components/PeerRatingSection.tsx",
+          "path": "frontend/src/components/ShareOfPoolSection.tsx",
           "operation": "modify",
-          "description": "Add actor availability check to the peer rating form. Disable the submit button and show a loading indicator while actor is initializing. Ensure the useRatePeer mutation only fires when actor is available."
-        },
-        {
-          "path": "frontend/src/components/CompleteProjectButton.tsx",
-          "operation": "modify",
-          "description": "Add actor availability check from useActor to disable the complete project button while actor is initializing. Show a loading spinner or tooltip indicating the backend is connecting if actor is unavailable."
-        },
-        {
-          "path": "frontend/src/components/ProfileSetupModal.tsx",
-          "operation": "modify",
-          "description": "Add actor availability check to the profile setup form. Disable the submit button and show a loading indicator while actor is initializing. Ensure the useRegisterUser mutation only fires when actor is available, preventing registration errors on first login."
+          "description": "Add a note at the top of the section clarifying that only confirmed pledges are included in the share-of-pool calculation, and pending/expired pledges are excluded. This reinforces the pledge lifecycle for users viewing their potential payout."
         }
       ]
     }

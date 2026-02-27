@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Project } from '../backend';
-import { useGetPeerRatings, useRatePeer, useGetUserProfile } from '../hooks/useQueries';
+import { Project, PeerRating } from '../backend';
+import { useRatePeer, useGetUserProfile } from '../hooks/useQueries';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { Principal } from '@icp-sdk/core/principal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,6 @@ interface PeerRatingSectionProps {
 export default function PeerRatingSection({ project }: PeerRatingSectionProps) {
   const [selectedPeer, setSelectedPeer] = useState<string>('');
   const [rating, setRating] = useState<string>('');
-  const { data: ratings = [] } = useGetPeerRatings(project.id);
   const ratePeer = useRatePeer();
   const { identity } = useInternetIdentity();
 
@@ -85,7 +84,7 @@ export default function PeerRatingSection({ project }: PeerRatingSectionProps) {
                   {otherParticipants.map((participant) => (
                     <ParticipantOption
                       key={participant.toString()}
-                      principal={participant.toString()}
+                      principal={participant}
                     />
                   ))}
                 </SelectContent>
@@ -114,32 +113,17 @@ export default function PeerRatingSection({ project }: PeerRatingSectionProps) {
           </form>
         </CardContent>
       </Card>
-
-      <div>
-        <h3 className="mb-4 text-lg font-semibold">Rating History</h3>
-        {ratings.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center">
-            <p className="text-muted-foreground">No ratings yet</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {ratings.map((rating, index) => (
-              <RatingRow key={index} rating={rating} />
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
 
-function ParticipantOption({ principal }: { principal: string }) {
+function ParticipantOption({ principal }: { principal: Principal }) {
   const { data: userProfile } = useGetUserProfile(principal);
 
   return (
-    <SelectItem value={principal}>
+    <SelectItem value={principal.toString()}>
       <div className="flex items-center gap-2">
-        <span>{principal.slice(0, 16)}...</span>
+        <span>{principal.toString().slice(0, 16)}...</span>
         {userProfile && (
           <Badge variant="secondary" className="text-xs">
             {userProfile.squadRole}
@@ -147,43 +131,5 @@ function ParticipantOption({ principal }: { principal: string }) {
         )}
       </div>
     </SelectItem>
-  );
-}
-
-function RatingRow({ rating }: { rating: any }) {
-  const { data: raterProfile } = useGetUserProfile(rating.rater.toString());
-  const { data: rateeProfile } = useGetUserProfile(rating.ratee.toString());
-
-  return (
-    <div className="flex items-center justify-between rounded-lg border p-3">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback>
-            {rating.rater.toString().slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div className="text-sm">
-          <div className="font-medium flex items-center gap-2 flex-wrap">
-            <span>{raterProfile?.friendlyUsername || `${rating.rater.toString().slice(0, 8)}...`}</span>
-            {raterProfile && (
-              <Badge variant="secondary" className="text-xs">
-                {raterProfile.squadRole}
-              </Badge>
-            )}
-            <span className="text-muted-foreground">rated</span>
-            <span>{rateeProfile?.friendlyUsername || `${rating.ratee.toString().slice(0, 8)}...`}</span>
-            {rateeProfile && (
-              <Badge variant="secondary" className="text-xs">
-                {rateeProfile.squadRole}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-1">
-        <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-        <span className="text-sm font-semibold">{rating.rating.toFixed(1)}</span>
-      </div>
-    </div>
   );
 }

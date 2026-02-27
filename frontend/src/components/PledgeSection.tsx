@@ -1,422 +1,330 @@
-import { Project, Pledge, SquadRole } from '../backend';
-import { useGetPledges, useSignOffPledge, useGetUserProfile } from '../hooks/useQueries';
+import React, { useState } from 'react';
+import { Project, Pledge, PledgeStatus } from '../backend';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
+import { useConfirmPledge, useReassignFromOtherTasks, useGetTasks } from '../hooks/useQueries';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Clock, AlertCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CheckCircle, Clock, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Task } from '../backend';
 
 interface PledgeSectionProps {
   project: Project;
-  userProfile?: { squadRole: SquadRole; friendlyUsername: string } | null;
+  pledges: Pledge[];
 }
 
-export default function PledgeSection({ project, userProfile = null }: PledgeSectionProps) {
-  const { data: pledges = [] } = useGetPledges(project.id);
+// ── Status helpers ──────────────────────────────────────────────────────────
+
+function getPledgeStatusLabel(status: PledgeStatus): string {
+  switch (status) {
+    case PledgeStatus.pending: return 'Pending';
+    case PledgeStatus.confirmed: return 'Confirmed';
+    case PledgeStatus.approved: return 'Approved';
+    case PledgeStatus.expired: return 'Expired';
+    case PledgeStatus.reassigned: return 'Reassigned';
+    default: return String(status);
+  }
+}
+
+function getPledgeStatusColor(status: PledgeStatus): string {
+  switch (status) {
+    case PledgeStatus.pending:
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
+    case PledgeStatus.confirmed:
+    case PledgeStatus.approved:
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800';
+    case PledgeStatus.expired:
+      return 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500 border-gray-200 dark:border-gray-700';
+    case PledgeStatus.reassigned:
+      return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+    default:
+      return 'bg-gray-100 text-gray-600 border-gray-200';
+  }
+}
+
+function getPledgeStatusNote(status: PledgeStatus): string {
+  switch (status) {
+    case PledgeStatus.pending:
+      return 'Awaiting PM confirmation — not yet counted in budget';
+    case PledgeStatus.confirmed:
+    case PledgeStatus.approved:
+      return 'Confirmed — included in HH budget and payout calculation';
+    case PledgeStatus.expired:
+      return 'Expired — not counted in budget';
+    case PledgeStatus.reassigned:
+      return 'Reassigned to a specific task';
+    default:
+      return '';
+  }
+}
+
+function getTargetLabel(pledge: Pledge, tasks: Task[]): string {
+  if (pledge.target.__kind__ === 'otherTasks') return 'General Pool';
+  // target.__kind__ === 'task'
+  const taskId = (pledge.target as { __kind__: 'task'; task: bigint }).task;
+  const task = tasks.find(t => t.id === taskId);
+  return task ? task.title : `Task #${String(taskId)}`;
+}
+
+// ── Main component ──────────────────────────────────────────────────────────
+
+export default function PledgeSection({ project, pledges }: PledgeSectionProps) {
   const { identity } = useInternetIdentity();
-  const signOffPledge = useSignOffPledge();
+  const callerPrincipal = identity?.getPrincipal().toString();
+  const isPM = project.creator.toString() === callerPrincipal;
 
-  // Only the PM (project creator) can sign off (confirm HH) pledges
-  const isCreator = identity?.getPrincipal().toString() === project.creator.toString();
+  const { data: tasks = [] } = useGetTasks(project.id);
+  const confirmPledge = useConfirmPledge();
+  const reassignFromOtherTasks = useReassignFromOtherTasks();
 
-  const pendingPledges = pledges.filter((p) => p.status === 'pending');
-  const approvedPledges = pledges.filter((p) => p.status === 'approved');
-  const reassignedPledges = pledges.filter((p) => p.status === 'reassigned');
+  const [reassignTargets, setReassignTargets] = useState<Record<number, string>>({});
 
-  const totalApprovedHH = approvedPledges.reduce((sum, p) => sum + p.amount, 0);
-  const totalPendingHH = pendingPledges.reduce((sum, p) => sum + p.amount, 0);
-  const totalActivePledgedHH = totalApprovedHH + totalPendingHH;
-  const remainingBudget = Math.max(0, project.estimatedTotalHH - totalActivePledgedHH);
-  const activationThreshold = project.estimatedTotalHH * 0.8;
-  const activationProgress = Math.min((totalApprovedHH / project.estimatedTotalHH) * 100, 100);
-  const isBudgetFull = remainingBudget <= 0;
+  const activePledges = pledges.filter(
+    p =>
+      p.status === PledgeStatus.pending ||
+      p.status === PledgeStatus.confirmed ||
+      p.status === PledgeStatus.approved
+  );
+  const expiredPledges = pledges.filter(p => p.status === PledgeStatus.expired);
+  const reassignedPledges = pledges.filter(p => p.status === PledgeStatus.reassigned);
 
-  const handleSignOff = async (pledgeId: bigint) => {
+  const confirmedTotal = pledges
+    .filter(p => p.status === PledgeStatus.confirmed || p.status === PledgeStatus.approved)
+    .reduce((sum, p) => sum + p.amount, 0);
+  const pendingTotal = pledges
+    .filter(p => p.status === PledgeStatus.pending)
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const handleConfirmPledge = async (pledgeIdx: number) => {
     try {
-      await signOffPledge.mutateAsync(pledgeId);
-      toast.success('Pledge approved!');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to approve pledge');
+      await confirmPledge.mutateAsync({ pledgeId: BigInt(pledgeIdx), projectId: project.id });
+      toast.success('Pledge confirmed — now counted in budget');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to confirm pledge');
     }
   };
 
-  const getTargetLabel = (pledge: Pledge) => {
-    if (pledge.target.__kind__ === 'otherTasks') return 'Other Tasks Pool';
-    return `Task #${(pledge.target as { __kind__: 'task'; task: bigint }).task?.toString() ?? '?'}`;
+  const handleReassign = async (pledgeIdx: number) => {
+    const taskIdStr = reassignTargets[pledgeIdx];
+    if (!taskIdStr) {
+      toast.error('Select a target task first');
+      return;
+    }
+    try {
+      await reassignFromOtherTasks.mutateAsync({
+        pledgeId: BigInt(pledgeIdx),
+        newTaskId: BigInt(taskIdStr),
+        projectId: project.id,
+      });
+      toast.success('Pledge reassigned to task');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to reassign pledge');
+    }
   };
 
-  if (project.status === 'active') {
-    return (
-      <div className="space-y-6">
-        <Card className="border-green-500/30 bg-green-500/5">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              <CardTitle className="text-green-700 dark:text-green-400">Project Activated</CardTitle>
-            </div>
-            <CardDescription>
-              This project has been activated. No further pledging is allowed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">
-              Total approved HH: <strong>{totalApprovedHH.toFixed(1)} HH</strong> of{' '}
-              <strong>{project.estimatedTotalHH.toFixed(1)} HH</strong> ({activationProgress.toFixed(0)}%)
-            </div>
-          </CardContent>
-        </Card>
-
-        <PledgeList
-          pledges={approvedPledges}
-          title="Approved Pledges"
-          currentUserPrincipal={identity?.getPrincipal().toString()}
-          getTargetLabel={getTargetLabel}
-        />
-      </div>
-    );
-  }
+  const regularTasks = tasks.filter(t => t.title !== 'Other Tasks');
 
   return (
-    <div className="space-y-6">
-      {/* Activation Progress */}
-      {project.status === 'pledging' && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Activation Progress</CardTitle>
-            <CardDescription>
-              Project activates when &gt;80% of HH is assigned and all pledges are signed off.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Approved HH</span>
-                <span className="font-medium">
-                  {totalApprovedHH.toFixed(1)} / {project.estimatedTotalHH.toFixed(1)} HH
-                  ({activationProgress.toFixed(0)}%)
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    activationProgress >= 80 ? 'bg-green-500' : 'bg-primary'
-                  }`}
-                  style={{ width: `${activationProgress}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0%</span>
-                <span className={activationProgress >= 80 ? 'text-green-500 font-medium' : ''}>
-                  80% threshold
-                </span>
-                <span>100%</span>
-              </div>
-            </div>
+    <TooltipProvider>
+      <div className="space-y-4">
 
-            {/* Remaining Budget Display */}
-            <div
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
-                isBudgetFull
-                  ? 'border-red-500/30 bg-red-500/5'
-                  : remainingBudget < project.estimatedTotalHH * 0.1
-                  ? 'border-yellow-500/30 bg-yellow-500/5'
-                  : 'border-primary/20 bg-primary/5'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {isBudgetFull ? (
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                ) : (
-                  <Clock
-                    className={`h-4 w-4 ${
-                      remainingBudget < project.estimatedTotalHH * 0.1
-                        ? 'text-yellow-500'
-                        : 'text-primary'
-                    }`}
-                  />
-                )}
-                <span
-                  className={
-                    isBudgetFull
-                      ? 'font-semibold text-red-700 dark:text-red-400'
-                      : remainingBudget < project.estimatedTotalHH * 0.1
-                      ? 'font-semibold text-yellow-700 dark:text-yellow-400'
-                      : 'font-semibold text-primary'
-                  }
-                >
-                  {isBudgetFull
-                    ? 'Budget fully pledged'
-                    : `${remainingBudget.toFixed(1)} HH remaining to pledge`}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {totalActivePledgedHH.toFixed(1)} / {project.estimatedTotalHH.toFixed(1)} HH pledged
-              </span>
-            </div>
-
-            <div className="flex gap-4 text-sm">
-              {totalPendingHH > 0 && (
-                <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{pendingPledges.length} pending ({totalPendingHH.toFixed(1)} HH)</span>
-                </div>
-              )}
-              {pendingPledges.length === 0 && totalApprovedHH > 0 && (
-                <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                  <CheckCircle className="h-4 w-4" />
-                  <span>All pledges signed off</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* PM: Pending Pledges Sign-off — only visible to project creator */}
-      {isCreator && pendingPledges.length > 0 && (
-        <Card className="border-yellow-500/30 bg-yellow-500/5">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-yellow-500" />
-              <CardTitle className="text-base text-yellow-700 dark:text-yellow-400">
-                Pending Sign-off ({pendingPledges.length})
-              </CardTitle>
-            </div>
-            <CardDescription>
-              As Project Manager, review and confirm these pledges. Only approved pledges count toward project activation.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {pendingPledges.map((pledge, idx) => (
-              <PendingPledgeRow
-                key={idx}
-                pledge={pledge}
-                pledgeIndex={idx}
-                allPledges={pledges}
-                currentUserPrincipal={identity?.getPrincipal().toString()}
-                getTargetLabel={getTargetLabel}
-                onSignOff={handleSignOff}
-                isSigningOff={signOffPledge.isPending}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Non-PM: show info about pending pledges */}
-      {!isCreator && pendingPledges.length > 0 && (
-        <Card className="border-yellow-500/20 bg-yellow-500/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-yellow-500" />
-              <CardTitle className="text-sm text-yellow-700 dark:text-yellow-400">
-                {pendingPledges.length} pledge(s) awaiting PM confirmation
-              </CardTitle>
-            </div>
-            <CardDescription>
-              The Project Manager needs to confirm these pledges before they count toward activation.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-
-      {/* Approved Pledges */}
-      {approvedPledges.length > 0 && (
-        <PledgeList
-          pledges={approvedPledges}
-          title={`Approved Pledges (${approvedPledges.length})`}
-          currentUserPrincipal={identity?.getPrincipal().toString()}
-          getTargetLabel={getTargetLabel}
-        />
-      )}
-
-      {/* Reassigned Pledges */}
-      {reassignedPledges.length > 0 && (
-        <PledgeList
-          pledges={reassignedPledges}
-          title={`Reassigned Pledges (${reassignedPledges.length})`}
-          currentUserPrincipal={identity?.getPrincipal().toString()}
-          getTargetLabel={getTargetLabel}
-          variant="muted"
-        />
-      )}
-
-      {pledges.length === 0 && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-muted-foreground">No pledges yet</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Pledge HH to tasks or the Other Tasks pool from the Tasks tab
+        {/* Lifecycle explanation */}
+        <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2">
+          <p className="text-sm font-semibold flex items-center gap-1.5">
+            <Info className="h-4 w-4 text-primary" />
+            Pledge Lifecycle
           </p>
+          <ol className="text-xs text-muted-foreground space-y-1 list-none">
+            <li className="flex items-start gap-2">
+              <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 font-semibold shrink-0">1</span>
+              <span><strong>Participant submits pledge</strong> → status: <em>Pending</em> — not yet counted in budget</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 font-semibold shrink-0">2</span>
+              <span><strong>PM confirms the task</strong> (Tasks tab, Step 1) — required before pledges can be confirmed</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 font-semibold shrink-0">3</span>
+              <span><strong>PM confirms the pledge</strong> (Step 2) → status: <em>Confirmed</em> — counted in budget &amp; payout</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 font-semibold shrink-0">!</span>
+              <span>Pledges not confirmed within <strong>14 days</strong> expire automatically</span>
+            </li>
+          </ol>
         </div>
-      )}
-    </div>
-  );
-}
 
-interface PendingPledgeRowProps {
-  pledge: Pledge;
-  pledgeIndex: number;
-  allPledges: Pledge[];
-  currentUserPrincipal?: string;
-  getTargetLabel: (pledge: Pledge) => string;
-  onSignOff: (pledgeId: bigint) => void;
-  isSigningOff: boolean;
-}
-
-function PendingPledgeRow({
-  pledge,
-  pledgeIndex,
-  allPledges,
-  currentUserPrincipal,
-  getTargetLabel,
-  onSignOff,
-  isSigningOff,
-}: PendingPledgeRowProps) {
-  const { data: userProfile } = useGetUserProfile(pledge.user);
-
-  // Find the actual index in the full pledges array to use as pledge ID
-  const fullIndex = allPledges.findIndex(
-    (p) =>
-      p.user.toString() === pledge.user.toString() &&
-      p.amount === pledge.amount &&
-      p.status === pledge.status &&
-      p.timestamp === pledge.timestamp
-  );
-  const pledgeId = BigInt(fullIndex >= 0 ? fullIndex : pledgeIndex);
-
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-background p-3">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className="text-xs">
-            {pledge.user.toString().slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <div className="text-sm font-medium">
-            {pledge.user.toString() === currentUserPrincipal
-              ? 'You'
-              : userProfile?.friendlyUsername || `${pledge.user.toString().slice(0, 8)}...`}
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            {userProfile && (
-              <Badge variant="secondary" className="text-xs py-0">
-                {userProfile.squadRole}
-              </Badge>
-            )}
-            <span className="text-xs text-muted-foreground">{getTargetLabel(pledge)}</span>
-          </div>
+        {/* Summary row */}
+        <div className="flex flex-wrap gap-4 text-sm">
+          <span>
+            Confirmed: <span className="font-bold text-green-600 dark:text-green-400">{confirmedTotal.toFixed(1)} HH</span>
+          </span>
+          {pendingTotal > 0 && (
+            <span>
+              Pending: <span className="font-bold text-yellow-600 dark:text-yellow-400">{pendingTotal.toFixed(1)} HH</span>
+              <span className="text-muted-foreground ml-1">(not yet in budget)</span>
+            </span>
+          )}
+          <span className="text-muted-foreground">
+            Estimated total: {project.estimatedTotalHH} HH
+          </span>
         </div>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold">{pledge.amount.toFixed(1)} HH</span>
-        <Button
-          size="sm"
-          onClick={() => onSignOff(pledgeId)}
-          disabled={isSigningOff}
-          className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
-        >
-          <ShieldCheck className="mr-1 h-3 w-3" />
-          {isSigningOff ? '...' : 'Confirm HH'}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
-interface PledgeListProps {
-  pledges: Pledge[];
-  title: string;
-  currentUserPrincipal?: string;
-  getTargetLabel: (pledge: Pledge) => string;
-  variant?: 'default' | 'muted';
-}
-
-function PledgeList({
-  pledges,
-  title,
-  currentUserPrincipal,
-  getTargetLabel,
-  variant = 'default',
-}: PledgeListProps) {
-  return (
-    <div>
-      <h3 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-        {title}
-      </h3>
-      <div className="space-y-2">
-        {pledges.map((pledge, index) => (
-          <PledgeRow
-            key={index}
-            pledge={pledge}
-            currentUserPrincipal={currentUserPrincipal}
-            getTargetLabel={getTargetLabel}
-            variant={variant}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PledgeRow({
-  pledge,
-  currentUserPrincipal,
-  getTargetLabel,
-  variant,
-}: {
-  pledge: Pledge;
-  currentUserPrincipal?: string;
-  getTargetLabel: (pledge: Pledge) => string;
-  variant?: 'default' | 'muted';
-}) {
-  const { data: userProfile } = useGetUserProfile(pledge.user);
-
-  return (
-    <div
-      className={`flex items-center justify-between rounded-lg border p-3 ${
-        variant === 'muted' ? 'opacity-60' : ''
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className="text-xs">
-            {pledge.user.toString().slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <div className="text-sm font-medium">
-            {pledge.user.toString() === currentUserPrincipal
-              ? 'You'
-              : userProfile?.friendlyUsername || `${pledge.user.toString().slice(0, 8)}...`}
+        {/* Active pledges */}
+        {activePledges.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground text-sm">
+            No pledges yet for this project.
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            {userProfile && (
-              <Badge variant="secondary" className="text-xs py-0">
-                {userProfile.squadRole}
-              </Badge>
-            )}
-            <span className="text-xs text-muted-foreground">{getTargetLabel(pledge)}</span>
+        ) : (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Active Pledges</h4>
+            {activePledges.map(pledge => {
+              const globalIdx = pledges.indexOf(pledge);
+              const isPending = pledge.status === PledgeStatus.pending;
+              const isOtherTasksPledge = pledge.target.__kind__ === 'otherTasks';
+
+              return (
+                <div
+                  key={globalIdx}
+                  className={`rounded-lg border p-3 space-y-2 transition-colors ${
+                    isPending
+                      ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/10'
+                      : 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/10'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold">{pledge.amount.toFixed(1)} HH</span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getPledgeStatusColor(pledge.status)}`}>
+                          {getPledgeStatusLabel(pledge.status)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Target: <span className="font-medium text-foreground">{getTargetLabel(pledge, tasks)}</span>
+                        {' · '}
+                        By: <span className="font-mono">{pledge.user.toString().slice(0, 10)}…</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status note */}
+                  <div className={`text-xs px-2.5 py-1.5 rounded flex items-center gap-1.5 ${
+                    isPending
+                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400'
+                      : 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                  }`}>
+                    {isPending
+                      ? <Clock className="h-3 w-3 shrink-0" />
+                      : <CheckCircle className="h-3 w-3 shrink-0" />
+                    }
+                    {getPledgeStatusNote(pledge.status)}
+                  </div>
+
+                  {/* PM actions for pending pledges */}
+                  {isPM && isPending && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleConfirmPledge(globalIdx)}
+                        disabled={confirmPledge.isPending}
+                        className="gap-1.5 text-xs h-7"
+                      >
+                        {confirmPledge.isPending
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <CheckCircle className="h-3 w-3" />
+                        }
+                        Confirm Pledge (Step 2)
+                      </Button>
+
+                      {isOtherTasksPledge && regularTasks.length > 0 && (
+                        <div className="flex gap-1.5 items-center">
+                          <Select
+                            value={reassignTargets[globalIdx] ?? ''}
+                            onValueChange={val =>
+                              setReassignTargets(prev => ({ ...prev, [globalIdx]: val }))
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs w-36">
+                              <SelectValue placeholder="Reassign to…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {regularTasks.map(t => (
+                                <SelectItem key={String(t.id)} value={String(t.id)}>
+                                  {t.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleReassign(globalIdx)}
+                            disabled={reassignFromOtherTasks.isPending || !reassignTargets[globalIdx]}
+                            className="h-7 text-xs"
+                          >
+                            {reassignFromOtherTasks.isPending
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : 'Reassign'
+                            }
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
+
+        {/* Expired pledges */}
+        {expiredPledges.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Expired Pledges</h4>
+            {expiredPledges.map(pledge => {
+              const globalIdx = pledges.indexOf(pledge);
+              return (
+                <div key={globalIdx} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 opacity-50 bg-gray-50 dark:bg-gray-900/20">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm text-muted-foreground">
+                      {pledge.amount.toFixed(1)} HH — {getTargetLabel(pledge, tasks)}
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getPledgeStatusColor(pledge.status)}`}>
+                      Expired
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Not counted in budget or payout</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Reassigned pledges */}
+        {reassignedPledges.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reassigned Pledges</h4>
+            {reassignedPledges.map(pledge => {
+              const globalIdx = pledges.indexOf(pledge);
+              return (
+                <div key={globalIdx} className="rounded-lg border border-purple-200 dark:border-purple-800 p-3 opacity-70 bg-purple-50/30 dark:bg-purple-950/10">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm text-muted-foreground">
+                      {pledge.amount.toFixed(1)} HH — originally {getTargetLabel(pledge, tasks)}
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${getPledgeStatusColor(pledge.status)}`}>
+                      Reassigned
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold">{pledge.amount.toFixed(1)} HH</span>
-        <Badge
-          variant="outline"
-          className={
-            pledge.status === 'approved'
-              ? 'text-green-600 border-green-500/30 text-xs'
-              : pledge.status === 'reassigned'
-              ? 'text-gray-500 border-gray-400/30 text-xs'
-              : 'text-yellow-600 border-yellow-500/30 text-xs'
-          }
-        >
-          {pledge.status}
-        </Badge>
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

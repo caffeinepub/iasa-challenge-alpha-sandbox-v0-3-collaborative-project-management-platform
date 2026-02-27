@@ -1,41 +1,67 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-27T19:45:02.893Z",
-  "summary": "The diff implements fixes for actor availability and data loading issues. REQ-1 is well addressed with disabled buttons and spinner states in CreateProjectDialog and MainApp. REQ-3 is partially addressed via actor readiness checks in components. However, the critical useQueries.ts file is not present in the diff, so we cannot confirm that enabled: !!actor guards were added to useQuery hooks, that React Query cache invalidation/refetch after actor initialization was implemented, or that useMutation hooks surface clear UI messages for actor unavailability.",
+  "generatedAt": "2026-02-27T20:55:02.714Z",
+  "summary": "The diff implements fixes for all three requirements: REQ-1 (ProjectDetailsDialog crash fix via conditional rendering), REQ-2 (TaskCard status badges and lifecycle labels), and REQ-3 (PledgeSection status badges and notes). Most acceptance criteria appear to be addressed. However, there are some gaps between the build request's specified lifecycle states and what is actually implemented in the diff.",
   "missing_requirements": [
     {
       "id": "REQ-2",
-      "requirement": "React Query hooks correctly invalidate and refetch project and task data after actor initialization.",
-      "reason": "The useQueries.ts file is not shown in the diff. There is no evidence that query invalidation or refetch-on-actor-ready logic was added to the hooks themselves. Dashboard and MainApp changes alone do not confirm this AC is met.",
+      "requirement": "Task lifecycle must include 'open' and 'approved' states as specified. Action buttons shown only in correct states (e.g., 'Pledge' only when open, 'Approve' only when completed).",
+      "reason": "The diff's TaskCard uses statuses 'proposed', 'taskConfirmed', 'inProgress', 'inAudit', 'completed', 'rejected' which do not match the build request's specified states of 'open', 'inProgress', 'completed', 'approved'. The 'approved' task status is absent from TaskCard helpers, and the lifecycle legend in TasksSection does not show the 'open'/'approved' states from the spec.",
       "evidence": [
-        "frontend/src/components/Dashboard.tsx",
-        "frontend/src/components/MainApp.tsx"
+        "frontend/src/components/TaskCard.tsx",
+        "frontend/src/components/TasksSection.tsx"
       ]
     },
     {
-      "id": "REQ-3",
-      "requirement": "All useQuery hooks that depend on the actor have enabled: !!actor guards so they do not fire before the actor is ready.",
-      "reason": "The useQueries.ts file is not included in the diff. Without seeing it, there is no evidence that enabled: !!actor guards were added to the query hooks.",
-      "evidence": []
+      "id": "REQ-2",
+      "requirement": "A short inline label or tooltip on each TaskCard explains what the next required step is, specifically including 'Awaiting pledge confirmation by PM' as called out in the AC.",
+      "reason": "The getNextStepLabel function does not include a dedicated step for 'Awaiting pledge confirmation by PM'. The spec explicitly cites this as an example next-step label, but no task-level state maps to this pledge-confirmation waiting step.",
+      "evidence": [
+        "frontend/src/components/TaskCard.tsx"
+      ]
     },
     {
-      "id": "REQ-3",
-      "requirement": "All useMutation hooks check actor availability before invoking backend calls and surface a clear UI message if the actor is unavailable.",
-      "reason": "The useQueries.ts file is not present in the diff. CreateProjectDialog checks actor readiness at the component level, but the mutation hooks themselves in useQueries.ts are not shown to include actor availability checks with clear UI messaging.",
+      "id": "REQ-1",
+      "requirement": "The dialog opens for projects in all statuses including 'drafting'.",
+      "reason": "The ProjectDetailsDialog status label and color helpers only handle 'pledging', 'active', 'completed', and 'archived'. There is no 'drafting' case, so projects in drafting status fall through to the default and may not render the correct status badge.",
       "evidence": [
-        "frontend/src/components/CreateProjectDialog.tsx"
+        "frontend/src/components/ProjectDetailsDialog.tsx"
       ]
     }
   ],
-  "hallucinated_features": [],
+  "hallucinated_features": [
+    {
+      "description": "Additional pledge statuses 'approved' and 'reassigned' are handled in PledgeSection with dedicated badges, color classes, and status notes.",
+      "reason": "REQ-3 only specifies three pledge lifecycle states: pending, confirmed, and expired. The diff adds 'approved' and 'reassigned' handling that was not requested.",
+      "evidence": [
+        "frontend/src/components/PledgeSection.tsx"
+      ]
+    },
+    {
+      "description": "A 'reassign from other tasks' feature with a Select dropdown UI is implemented in PledgeSection including reassignFromOtherTasks mutation and reassignTargets state.",
+      "reason": "The build request does not mention any pledge reassignment functionality. This feature goes beyond the scope of REQ-3.",
+      "evidence": [
+        "frontend/src/components/PledgeSection.tsx"
+      ]
+    },
+    {
+      "description": "TaskCard includes 'isMentor' role logic and a mentor-specific audit step, and TasksSection lifecycle legend includes a '4. In Audit (24h)' step.",
+      "reason": "REQ-2 specifies a 6-step lifecycle ending at PM approval of task completion with no mention of a mentor audit window or inAudit status. These steps were not requested.",
+      "evidence": [
+        "frontend/src/components/TaskCard.tsx",
+        "frontend/src/components/TasksSection.tsx"
+      ]
+    }
+  ],
   "confidence": 0.72,
   "changed_files": [
-    "backend/main.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/CreateProjectDialog.tsx",
-    "frontend/src/components/Dashboard.tsx",
-    "frontend/src/components/MainApp.tsx",
+    "frontend/src/components/PledgeSection.tsx",
+    "frontend/src/components/ProjectDetailsDialog.tsx",
+    "frontend/src/components/ShareOfPoolSection.tsx",
+    "frontend/src/components/TaskCard.tsx",
+    "frontend/src/components/TasksSection.tsx",
     "project_state.json"
   ]
 }

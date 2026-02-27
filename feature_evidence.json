@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-actor-not-available-error-that-occurs-when-a-user-attempts-to-create-a-project-ensure-the-backend-actor-is-fully-initialized-and-available-before-any-mutation-calls-createproject-createtask-etc-are-made-from-the-frontend-if-the-actor-is-not-yet-ready-show-a-loading-state-or-disabled-button-rather-than-an-error",
-      "featureTitle": "Fix the 'actor not available' error that occurs when a user attempts to create a project. Ensure the backend actor is fully initialized and available before any mutation calls (createProject, createTask, etc.) are made from the frontend. If the actor is not yet ready, show a loading state or disabled button rather than an error.",
+      "featureId": "feature-fix-the-projectdetailsdialog-draft-view-so-that-it-opens-correctly-when-triggered-from-a-projectcard-investigate-and-resolve-any-rendering-or-state-error-that-prevents-the-dialog-from-mounting-in-the-current-deployment",
+      "featureTitle": "Fix the ProjectDetailsDialog (draft view) so that it opens correctly when triggered from a ProjectCard. Investigate and resolve any rendering or state error that prevents the dialog from mounting in the current deployment.",
       "files": [
-        "frontend/src/components/CreateProjectDialog.tsx"
+        "frontend/src/components/ProjectDetailsDialog.tsx"
       ],
       "components": [
         "authorization@1.0.1",
@@ -21,10 +21,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-restore-correct-data-loading-so-that-all-previously-persisted-projects-and-tasks-are-fetched-and-displayed-in-the-dashboard-on-login-the-frontend-must-not-ignore-existing-backend-state-all-projects-and-tasks-stored-in-the-canister-must-be-retrieved-and-rendered-correctly-after-authentication",
-      "featureTitle": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard on login. The frontend must not ignore existing backend state — all projects and tasks stored in the canister must be retrieved and rendered correctly after authentication.",
+      "featureId": "feature-in-the-tasks-section-and-taskcard-components-clearly-display-the-sequential-lifecycle-conditions-for-a-task-1-task-is-created-by-pm-in-open-state-2-a-participant-pledges-hh-hours-to-the-task-pledge-status-pending-3-pm-confirms-the-pledge-pledge-status-confirmed-4-once-the-task-has-sufficient-confirmed-pledges-the-pm-can-set-the-task-to-inprogress-5-the-assignee-marks-the-task-as-completed-6-pm-approves-the-task-completion-task-status-approved-each-state-transition-should-be-visually-distinct-with-a-status-badge-or-label",
+      "featureTitle": "In the Tasks section and TaskCard components, clearly display the sequential lifecycle conditions for a task: (1) Task is created by PM in 'open' state; (2) A participant pledges HH hours to the task (pledge status = 'pending'); (3) PM confirms the pledge (pledge status = 'confirmed'); (4) Once the task has sufficient confirmed pledges, the PM can set the task to 'inProgress'; (5) The assignee marks the task as 'completed'; (6) PM approves the task completion (task status = 'approved'). Each state transition should be visually distinct with a status badge or label.",
       "files": [
-        "frontend/src/components/Dashboard.tsx"
+        "frontend/src/components/TaskCard.tsx",
+        "frontend/src/components/TasksSection.tsx"
       ],
       "components": [
         "authorization@1.0.1",
@@ -40,10 +41,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-ensure-the-useactor-hook-and-all-dependent-react-query-hooks-usequeries-ts-wait-for-the-actor-to-be-fully-available-before-executing-queries-or-mutations-guard-all-actor-dependent-query-functions-so-they-are-only-called-when-the-actor-instance-is-non-null-preventing-race-conditions-on-initial-load",
-      "featureTitle": "Ensure the useActor hook and all dependent React Query hooks (useQueries.ts) wait for the actor to be fully available before executing queries or mutations. Guard all actor-dependent query functions so they are only called when the actor instance is non-null, preventing race conditions on initial load.",
+      "featureId": "feature-in-the-pledgesection-component-clearly-display-the-sequential-lifecycle-conditions-for-a-pledge-1-participant-submits-a-pledge-status-pending-not-counted-in-confirmed-budget-2-pm-reviews-and-confirms-the-pledge-status-confirmed-now-counted-in-hh-budget-and-share-of-pool-3-if-not-confirmed-within-the-expiry-window-pledge-becomes-expired-show-each-pledge-with-its-current-status-and-indicate-what-action-is-needed-next-e-g-awaiting-pm-confirmation",
+      "featureTitle": "In the PledgeSection component, clearly display the sequential lifecycle conditions for a pledge: (1) Participant submits a pledge (status = 'pending', not counted in confirmed budget); (2) PM reviews and confirms the pledge (status = 'confirmed', now counted in HH budget and Share of Pool); (3) If not confirmed within the expiry window, pledge becomes 'expired'. Show each pledge with its current status and indicate what action is needed next (e.g., 'Awaiting PM confirmation').",
       "files": [
-        "frontend/src/components/MainApp.tsx"
+        "frontend/src/components/PledgeSection.tsx",
+        "frontend/src/components/ShareOfPoolSection.tsx"
       ],
       "components": [
         "authorization@1.0.1",

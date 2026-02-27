@@ -1,25 +1,24 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useActor } from './useActor';
-import {
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useActor } from "./useActor";
+import type {
   UserProfile,
   Project,
   Task,
   Pledge,
-  PeerRating,
-  SquadRole,
   PledgeTarget,
-} from '../backend';
-import { Principal } from '@icp-sdk/core/principal';
-
-// ─── User Profile ────────────────────────────────────────────────────────────
+  SquadRole,
+  PeerRating,
+} from "../backend";
+import { PledgeStatus } from "../backend";
+import type { Principal } from "@icp-sdk/core/principal";
 
 export function useGetCallerUserProfile() {
   const { actor, isFetching: actorFetching } = useActor();
 
   const query = useQuery<UserProfile | null>({
-    queryKey: ['currentUserProfile'],
+    queryKey: ["currentUserProfile"],
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) throw new Error("Actor not available");
       return actor.getCallerUserProfile();
     },
     enabled: !!actor && !actorFetching,
@@ -33,18 +32,32 @@ export function useGetCallerUserProfile() {
   };
 }
 
-export function useGetUserProfile(principal: string | Principal) {
-  const { actor, isFetching } = useActor();
+export function useGetUserProfile(user: Principal | null) {
+  const { actor, isFetching: actorFetching } = useActor();
 
   return useQuery<UserProfile | null>({
-    queryKey: ['userProfile', principal.toString()],
+    queryKey: ["userProfile", user?.toString()],
     queryFn: async () => {
-      if (!actor) return null;
-      const principalObj =
-        typeof principal === 'string' ? Principal.fromText(principal) : principal;
-      return actor.getUserProfile(principalObj);
+      if (!actor || !user) return null;
+      return actor.getUserProfile(user);
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !actorFetching && !!user,
+    retry: false,
+  });
+}
+
+export function useSaveCallerUserProfile() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (profile: UserProfile) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.saveCallerUserProfile(profile);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
+    },
   });
 }
 
@@ -60,42 +73,25 @@ export function useRegisterUser() {
       username: string;
       role: SquadRole;
     }) => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) throw new Error("Actor not available");
       return actor.registerUser(username, role);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
     },
   });
 }
-
-export function useSaveCallerUserProfile() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (profile: UserProfile) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.saveCallerUserProfile(profile);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-    },
-  });
-}
-
-// ─── Projects ────────────────────────────────────────────────────────────────
 
 export function useGetProjects() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching: actorFetching } = useActor();
 
   return useQuery<Project[]>({
-    queryKey: ['projects'],
+    queryKey: ["projects"],
     queryFn: async () => {
       if (!actor) return [];
       return actor.getProjects();
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !actorFetching,
   });
 }
 
@@ -104,7 +100,14 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: {
+    mutationFn: async ({
+      title,
+      description,
+      estimatedTotalHH,
+      finalMonetaryValue,
+      sharedResourceLink,
+      otherTasksPoolHH,
+    }: {
       title: string;
       description: string;
       estimatedTotalHH: number;
@@ -112,18 +115,214 @@ export function useCreateProject() {
       sharedResourceLink: string | null;
       otherTasksPoolHH: number;
     }) => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) throw new Error("Actor not available");
       return actor.createProject(
-        params.title,
-        params.description,
-        params.estimatedTotalHH,
-        params.finalMonetaryValue,
-        params.sharedResourceLink,
-        params.otherTasksPoolHH
+        title,
+        description,
+        estimatedTotalHH,
+        finalMonetaryValue,
+        sharedResourceLink,
+        otherTasksPoolHH
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
+export function useGetTasks(projectId: bigint) {
+  const { actor, isFetching: actorFetching } = useActor();
+
+  return useQuery<Task[]>({
+    queryKey: ["tasks", projectId.toString()],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getTasks(projectId);
+    },
+    enabled: !!actor && !actorFetching,
+  });
+}
+
+export function useCreateTask() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      title,
+      description,
+      hhBudget,
+      dependencies,
+    }: {
+      projectId: bigint;
+      title: string;
+      description: string;
+      hhBudget: number;
+      dependencies: bigint[];
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.createTask(projectId, title, description, hhBudget, dependencies);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", variables.projectId.toString()],
+      });
+    },
+  });
+}
+
+export function useGetPledges(projectId: bigint) {
+  const { actor, isFetching: actorFetching } = useActor();
+
+  return useQuery<Pledge[]>({
+    queryKey: ["pledges", projectId.toString()],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getPledges(projectId);
+    },
+    enabled: !!actor && !actorFetching,
+  });
+}
+
+export function usePledgeToTask() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      target,
+      amount,
+    }: {
+      projectId: bigint;
+      target: PledgeTarget;
+      amount: number;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.pledgeToTask(projectId, target, amount);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["pledges", variables.projectId.toString()],
+      });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
+    },
+  });
+}
+
+export function useConfirmTask() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ taskId, projectId }: { taskId: bigint; projectId: bigint }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.confirmTask(taskId);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", variables.projectId.toString()],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["pledges", variables.projectId.toString()],
+      });
+    },
+  });
+}
+
+export function useConfirmPledge() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      pledgeId,
+      projectId,
+    }: {
+      pledgeId: bigint;
+      projectId: bigint;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.confirmPledge(pledgeId);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["pledges", variables.projectId.toString()],
+      });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
+export function useAcceptTask() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      projectId,
+    }: {
+      taskId: bigint;
+      projectId: bigint;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.acceptTask(taskId);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", variables.projectId.toString()],
+      });
+    },
+  });
+}
+
+export function useCompleteTask() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      projectId,
+    }: {
+      taskId: bigint;
+      projectId: bigint;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.completeTask(taskId);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", variables.projectId.toString()],
+      });
+    },
+  });
+}
+
+export function useApproveTask() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      projectId,
+    }: {
+      taskId: bigint;
+      projectId: bigint;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.approveTask(taskId);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["tasks", variables.projectId.toString()],
+      });
+      queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
     },
   });
 }
@@ -134,171 +333,50 @@ export function useCompleteProject() {
 
   return useMutation({
     mutationFn: async (projectId: bigint) => {
-      if (!actor) throw new Error('Actor not available');
+      if (!actor) throw new Error("Actor not available");
       return actor.completeProject(projectId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }
 
-// ─── Tasks ───────────────────────────────────────────────────────────────────
+export function useGetPeerRatings(projectId: bigint) {
+  const { actor, isFetching: actorFetching } = useActor();
 
-export function useGetTasks(projectId: bigint) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<Task[]>({
-    queryKey: ['tasks', projectId.toString()],
+  return useQuery<PeerRating[]>({
+    queryKey: ["peerRatings", projectId.toString()],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getTasks(projectId);
+      return actor.getPeerRatings(projectId);
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !actorFetching,
   });
 }
 
-export function useCreateTask() {
+export function useRatePeer() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: {
+    mutationFn: async ({
+      ratee,
+      projectId,
+      rating,
+    }: {
+      ratee: Principal;
       projectId: bigint;
-      title: string;
-      description: string;
-      hhBudget: number;
-      dependencies: bigint[];
+      rating: number;
     }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.createTask(
-        params.projectId,
-        params.title,
-        params.description,
-        params.hhBudget,
-        params.dependencies
-      );
+      if (!actor) throw new Error("Actor not available");
+      return actor.ratePeer(ratee, projectId, rating);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ['tasks', variables.projectId.toString()],
+        queryKey: ["peerRatings", variables.projectId.toString()],
       });
-    },
-  });
-}
-
-export function useAcceptTask() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (taskId: bigint) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.acceptTask(taskId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
-}
-
-export function useCompleteTask() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (taskId: bigint) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.completeTask(taskId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
-}
-
-export function useApproveTask() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (taskId: bigint) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.approveTask(taskId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-    },
-  });
-}
-
-export function useChallengeTask() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { taskId: bigint; stakeHH: number }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.challengeTask(params.taskId, params.stakeHH);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['challenges'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
-}
-
-// ─── Pledges ─────────────────────────────────────────────────────────────────
-
-export function useGetPledges(projectId: bigint) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<Pledge[]>({
-    queryKey: ['pledges', projectId.toString()],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getPledges(projectId);
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function usePledgeToTask() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      projectId: bigint;
-      target: PledgeTarget;
-      amount: number;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.pledgeToTask(params.projectId, params.target, params.amount);
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ['pledges', variables.projectId.toString()],
-      });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-    },
-  });
-}
-
-export function useSignOffPledge() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (pledgeId: bigint) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.signOffPledge(pledgeId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pledges'] });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
     },
   });
 }
@@ -308,50 +386,33 @@ export function useReassignFromOtherTasks() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { pledgeId: bigint; newTaskId: bigint }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.reassignFromOtherTasks(params.pledgeId, params.newTaskId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pledges'] });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-  });
-}
-
-// ─── Peer Ratings ────────────────────────────────────────────────────────────
-
-export function useGetPeerRatings(projectId: bigint) {
-  const { actor, isFetching } = useActor();
-
-  return useQuery<PeerRating[]>({
-    queryKey: ['peerRatings', projectId.toString()],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getPeerRatings(projectId);
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useRatePeer() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      ratee: Principal;
+    mutationFn: async ({
+      pledgeId,
+      newTaskId,
+      projectId,
+    }: {
+      pledgeId: bigint;
+      newTaskId: bigint;
       projectId: bigint;
-      rating: number;
     }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.ratePeer(params.ratee, params.projectId, params.rating);
+      if (!actor) throw new Error("Actor not available");
+      return actor.reassignFromOtherTasks(pledgeId, newTaskId);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ['peerRatings', variables.projectId.toString()],
+        queryKey: ["pledges", variables.projectId.toString()],
       });
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
+}
+
+// Helper: only confirmed pledges count toward HH budget
+export function getConfirmedPledgedHH(pledges: Pledge[]): number {
+  return pledges
+    .filter(
+      (p) =>
+        p.status === PledgeStatus.confirmed || p.status === PledgeStatus.approved
+    )
+    .reduce((sum, p) => sum + p.amount, 0);
 }

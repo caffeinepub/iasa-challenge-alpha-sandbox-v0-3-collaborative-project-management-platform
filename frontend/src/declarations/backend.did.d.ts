@@ -31,8 +31,10 @@ export interface Pledge {
   'timestamp' : Time,
   'amount' : number,
 }
-export type PledgeStatus = { 'pending' : null } |
+export type PledgeStatus = { 'expired' : null } |
+  { 'pending' : null } |
   { 'approved' : null } |
+  { 'confirmed' : null } |
   { 'reassigned' : null };
 export type PledgeTarget = { 'task' : bigint } |
   { 'otherTasks' : null };
@@ -70,10 +72,12 @@ export interface Task {
   'auditStartTime' : [] | [Time],
 }
 export type TaskStatus = { 'active' : null } |
+  { 'taskConfirmed' : null } |
   { 'completed' : null } |
   { 'rejected' : null } |
   { 'proposed' : null } |
   { 'inAudit' : null } |
+  { 'pendingConfirmation' : null } |
   { 'inProgress' : null };
 export type Time = bigint;
 export interface UserProfile {
@@ -105,8 +109,11 @@ export interface _SERVICE {
   'approveTask' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'challengeTask' : ActorMethod<[bigint, number], undefined>,
+  'checkAndExpireOldPledges' : ActorMethod<[], undefined>,
   'completeProject' : ActorMethod<[bigint], undefined>,
   'completeTask' : ActorMethod<[bigint], undefined>,
+  'confirmPledge' : ActorMethod<[bigint], undefined>,
+  'confirmTask' : ActorMethod<[bigint], undefined>,
   'createProject' : ActorMethod<
     [string, string, number, number, [] | [string], number],
     bigint
@@ -131,7 +138,6 @@ export interface _SERVICE {
   'reassignFromOtherTasks' : ActorMethod<[bigint, bigint], undefined>,
   'registerUser' : ActorMethod<[string, SquadRole], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
-  'signOffPledge' : ActorMethod<[bigint], undefined>,
   'vote' : ActorMethod<
     [
       bigint,

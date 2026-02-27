@@ -46,8 +46,10 @@ export const PeerRating = IDL.Record({
   'rater' : IDL.Principal,
 });
 export const PledgeStatus = IDL.Variant({
+  'expired' : IDL.Null,
   'pending' : IDL.Null,
   'approved' : IDL.Null,
+  'confirmed' : IDL.Null,
   'reassigned' : IDL.Null,
 });
 export const PledgeTarget = IDL.Variant({
@@ -83,10 +85,12 @@ export const Project = IDL.Record({
 });
 export const TaskStatus = IDL.Variant({
   'active' : IDL.Null,
+  'taskConfirmed' : IDL.Null,
   'completed' : IDL.Null,
   'rejected' : IDL.Null,
   'proposed' : IDL.Null,
   'inAudit' : IDL.Null,
+  'pendingConfirmation' : IDL.Null,
   'inProgress' : IDL.Null,
 });
 export const Task = IDL.Record({
@@ -118,8 +122,11 @@ export const idlService = IDL.Service({
   'approveTask' : IDL.Func([IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'challengeTask' : IDL.Func([IDL.Nat, IDL.Float64], [], []),
+  'checkAndExpireOldPledges' : IDL.Func([], [], []),
   'completeProject' : IDL.Func([IDL.Nat], [], []),
   'completeTask' : IDL.Func([IDL.Nat], [], []),
+  'confirmPledge' : IDL.Func([IDL.Nat], [], []),
+  'confirmTask' : IDL.Func([IDL.Nat], [], []),
   'createProject' : IDL.Func(
       [
         IDL.Text,
@@ -157,7 +164,6 @@ export const idlService = IDL.Service({
   'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
   'registerUser' : IDL.Func([IDL.Text, SquadRole], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'signOffPledge' : IDL.Func([IDL.Nat], [], []),
   'vote' : IDL.Func(
       [
         IDL.Nat,
@@ -213,8 +219,10 @@ export const idlFactory = ({ IDL }) => {
     'rater' : IDL.Principal,
   });
   const PledgeStatus = IDL.Variant({
+    'expired' : IDL.Null,
     'pending' : IDL.Null,
     'approved' : IDL.Null,
+    'confirmed' : IDL.Null,
     'reassigned' : IDL.Null,
   });
   const PledgeTarget = IDL.Variant({
@@ -250,10 +258,12 @@ export const idlFactory = ({ IDL }) => {
   });
   const TaskStatus = IDL.Variant({
     'active' : IDL.Null,
+    'taskConfirmed' : IDL.Null,
     'completed' : IDL.Null,
     'rejected' : IDL.Null,
     'proposed' : IDL.Null,
     'inAudit' : IDL.Null,
+    'pendingConfirmation' : IDL.Null,
     'inProgress' : IDL.Null,
   });
   const Task = IDL.Record({
@@ -285,8 +295,11 @@ export const idlFactory = ({ IDL }) => {
     'approveTask' : IDL.Func([IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'challengeTask' : IDL.Func([IDL.Nat, IDL.Float64], [], []),
+    'checkAndExpireOldPledges' : IDL.Func([], [], []),
     'completeProject' : IDL.Func([IDL.Nat], [], []),
     'completeTask' : IDL.Func([IDL.Nat], [], []),
+    'confirmPledge' : IDL.Func([IDL.Nat], [], []),
+    'confirmTask' : IDL.Func([IDL.Nat], [], []),
     'createProject' : IDL.Func(
         [
           IDL.Text,
@@ -324,7 +337,6 @@ export const idlFactory = ({ IDL }) => {
     'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
     'registerUser' : IDL.Func([IDL.Text, SquadRole], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'signOffPledge' : IDL.Func([IDL.Nat], [], []),
     'vote' : IDL.Func(
         [
           IDL.Nat,

@@ -8,8 +8,13 @@ import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
 
+
+
 actor IASAChallenge {
   let accessControlState = AccessControl.initState();
+
+  // Heartbeat timer (every 24 hours)
+  transient let dayInNanos : Int = 24 * 60 * 60 * 1_000_000_000;
 
   public shared ({ caller }) func initializeAccessControl() : async () {
     AccessControl.initialize(accessControlState, caller);
@@ -68,6 +73,7 @@ actor IASAChallenge {
     completionTime : ?Time.Time;
   };
 
+  // Updated TaskStatus to include task confirmation state.
   public type TaskStatus = {
     #proposed;
     #active;
@@ -75,6 +81,8 @@ actor IASAChallenge {
     #inAudit;
     #completed;
     #rejected;
+    #pendingConfirmation;
+    #taskConfirmed;
   };
 
   public type Task = {
@@ -90,10 +98,13 @@ actor IASAChallenge {
     auditStartTime : ?Time.Time;
   };
 
+  // Updated type for PledgeStatus to include new states
   public type PledgeStatus = {
     #pending;
     #approved;
     #reassigned;
+    #confirmed;
+    #expired;
   };
 
   public type PledgeTarget = {
@@ -101,6 +112,7 @@ actor IASAChallenge {
     #otherTasks;
   };
 
+  // Updated Pledge type to allow tracking confirmation state.
   public type Pledge = {
     user : Principal;
     projectId : Nat;
@@ -188,8 +200,9 @@ actor IASAChallenge {
 
   private func getTotalAssignedHH(projectId : Nat) : Float {
     let projectPledges = Iter.toArray(natMap.vals(pledges));
-    let approvedPledges = Array.filter<Pledge>(projectPledges, func(p) { p.projectId == projectId and p.status == #approved });
-    Array.foldLeft<Pledge, Float>(approvedPledges, 0.0, func(acc, pledge) { acc + pledge.amount });
+    // Only count pledged HH that are in the `confirmed` or `approved` states - never count `pending`
+    let confirmedPledges = Array.filter<Pledge>(projectPledges, func(p) { p.projectId == projectId and (p.status == #confirmed or p.status == #approved) });
+    Array.foldLeft<Pledge, Float>(confirmedPledges, 0.0, func(acc, pledge) { acc + pledge.amount });
   };
 
   private func hasAlreadyRated(rater : Principal, ratee : Principal, projectId : Nat) : Bool {
@@ -216,7 +229,7 @@ actor IASAChallenge {
     Array.find<Pledge>(
       allPledges,
       func(p) {
-        p.user == user and p.projectId == projectId and (p.status == #approved or p.status == #pending or p.status == #reassigned);
+        p.user == user and p.projectId == projectId and (p.status == #confirmed or p.status == #approved or p.status == #pending or p.status == #reassigned);
       },
     ) != null;
   };
@@ -227,7 +240,7 @@ actor IASAChallenge {
     Array.find<Pledge>(
       allPledges,
       func(p) {
-        p.user == user and p.projectId == projectId and (p.status == #approved or p.status == #pending or p.status == #reassigned) and (
+        p.user == user and p.projectId == projectId and (p.status == #confirmed or p.status == #approved or p.status == #pending or p.status == #reassigned) and (
           switch (p.target) {
             case (#task tid) { tid == taskId };
             case (#otherTasks) { false };
@@ -247,9 +260,6 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only authenticated users can view profiles");
-    };
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
       Debug.trap("Unauthorized: Can only view your own profile");
     };
@@ -433,7 +443,7 @@ actor IASAChallenge {
         let projectPledges = Iter.toArray(natMap.vals(pledges));
         let relevantPledges = Array.filter<Pledge>(
           projectPledges,
-          func(p) { p.projectId == projectId and (p.status == #approved or p.status == #pending) },
+          func(p) { p.projectId == projectId and (p.status == #confirmed or p.status == #pending or p.status == #approved) },
         );
 
         let totalExistingPledged : Float = Array.foldLeft<Pledge, Float>(
@@ -516,13 +526,14 @@ actor IASAChallenge {
     };
   };
 
+  // Update ProjectStatus based on confirmed HH (not pending).
   func updateProjectStatus(projectId : Nat) : () {
     switch (natMap.get(projects, projectId)) {
       case null { };
       case (?project) {
         if (project.status != #pledging) { return };
 
-        let totalAssigned = getTotalAssignedHH(projectId);
+        let totalConfirmed = getTotalAssignedHH(projectId);
         let activationThreshold = project.estimatedTotalHH * 0.8;
 
         let hasPendingPledges = do {
@@ -535,7 +546,7 @@ actor IASAChallenge {
           ) != null;
         };
 
-        if (totalAssigned > activationThreshold and not hasPendingPledges) {
+        if (totalConfirmed > activationThreshold and not hasPendingPledges) {
           let activatedProject = { project with status = #active };
           projects := natMap.put(projects, projectId, activatedProject);
         };
@@ -543,10 +554,37 @@ actor IASAChallenge {
     };
   };
 
-  // Only the Project Manager (PM / creator) of a project may confirm HH (sign off pledges).
-  public shared ({ caller }) func signOffPledge(pledgeId : Nat) : async () {
+  // Only the Project Manager (PM / creator) of a project may confirm tasks for HH.
+  public shared ({ caller }) func confirmTask(taskId : Nat) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in users can sign off pledges");
+      Debug.trap("Unauthorized: Only signed-in users can confirm tasks");
+    };
+
+    switch (natMap.get(tasks, taskId)) {
+      case null { Debug.trap("Task not found") };
+      case (?task) {
+        switch (natMap.get(projects, task.projectId)) {
+          case null { Debug.trap("Project not found") };
+          case (?project) {
+            // Only the PM (project creator) may confirm tasks for HH
+            if (caller != project.creator) {
+              Debug.trap("Unauthorized: Only the Project Manager (creator) can confirm tasks for HH");
+            };
+
+            // Move task into "taskConfirmed state" first
+            let confirmedTask = { task with status = #taskConfirmed };
+
+            tasks := natMap.put(tasks, taskId, confirmedTask);
+          };
+        };
+      };
+    };
+  };
+
+  // The PM may then confirm individual pledges once the task has been confirmed.
+  public shared ({ caller }) func confirmPledge(pledgeId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only signed-in users can confirm pledges");
     };
 
     switch (natMap.get(pledges, pledgeId)) {
@@ -555,22 +593,39 @@ actor IASAChallenge {
         switch (natMap.get(projects, pledge.projectId)) {
           case null { Debug.trap("Project not found") };
           case (?project) {
-            // Only the PM (project creator) may confirm HH
+            // Only the PM (project creator) may confirm pledges
             if (caller != project.creator) {
-              Debug.trap("Unauthorized: Only the Project Manager (creator) can confirm HH and sign off pledges");
+              Debug.trap("Unauthorized: Only the Project Manager (creator) can confirm pledges");
             };
 
-            if (pledge.status != #pending) {
-              Debug.trap("Pledge is not pending approval");
+            if (pledge.status != #pending and pledge.status != #approved) {
+              Debug.trap("Pledge is not pending approval or already confirmed");
             };
 
-            let approvedPledge = {
+            // Only allow confirming pledges once the corresponding task has been confirmed
+            let taskConfirmed = switch (pledge.target) {
+              case (#task taskId) {
+                switch (natMap.get(tasks, taskId)) {
+                  case null { Debug.trap("Target task not found") };
+                  case (?task) {
+                    task.status == #taskConfirmed or task.status == #completed
+                  };
+                };
+              };
+              case (#otherTasks) { true };
+            };
+
+            if (not taskConfirmed) {
+              Debug.trap("Task must be confirmed first before confirming pledges");
+            };
+
+            // Move pledge to "confirmed" state
+            let confirmedPledge = {
               pledge with
-              status = #approved;
+              status = #confirmed;
             };
 
-            pledges := natMap.put(pledges, pledgeId, approvedPledge);
-
+            pledges := natMap.put(pledges, pledgeId, confirmedPledge);
             updateProjectStatus(pledge.projectId);
           };
         };
@@ -592,7 +647,7 @@ actor IASAChallenge {
             switch (natMap.get(projects, pledge.projectId)) {
               case null { Debug.trap("Project not found") };
               case (?project) {
-                // Only the PM (project creator) may reassign
+                // Only the PM (project creator) may reassign.
                 if (caller != project.creator) {
                   Debug.trap("Unauthorized: Only the Project Manager (creator) can reassign from Other Tasks pool");
                 };
@@ -607,7 +662,7 @@ actor IASAChallenge {
                     let reassignedPledge = {
                       pledge with
                       target = #task newTaskId;
-                      status = #reassigned;
+                      status = #reassigned; // Mark the old pledge as reassigned
                     };
 
                     pledges := natMap.put(pledges, pledgeId, reassignedPledge);
@@ -617,7 +672,7 @@ actor IASAChallenge {
                       projectId = pledge.projectId;
                       amount = pledge.amount;
                       target = #task newTaskId;
-                      status = #approved;
+                      status = #confirmed; // New target task is confirmed by default
                       timestamp = Time.now();
                     };
 
@@ -1134,5 +1189,30 @@ actor IASAChallenge {
     let allChallenges = Iter.toArray(natMap.vals(challenges));
     Array.filter<Challenge>(allChallenges, func(challenge) { challenge.taskId == taskId });
   };
-};
 
+  // Public function to trigger expiration check.
+  // Only admins may trigger this maintenance operation to prevent abuse.
+  public shared ({ caller }) func checkAndExpireOldPledges() : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Debug.trap("Unauthorized: Only admins can trigger pledge expiration");
+    };
+
+    let currentTime = Time.now();
+    let expirationPeriod : Int = 14 * 24 * 60 * 60 * 1_000_000_000;
+
+    let allPledges = Iter.toArray(natMap.entries(pledges));
+
+    for ((id, pledge) in allPledges.vals()) {
+      switch (pledge.status) {
+        case (#pending) {
+          if (currentTime - pledge.timestamp > expirationPeriod) {
+            // Expire the pledge
+            let expiredPledge = { pledge with status = #expired };
+            pledges := natMap.put(pledges, id, expiredPledge);
+          };
+        };
+        case (_) { };
+      };
+    };
+  };
+};

@@ -1,12 +1,16 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the "actor not available" error when creating a project and restore previously persisted project/task data on the Dashboard after login.
+**Goal:** Fix the ProjectDetailsDialog so it opens correctly from a ProjectCard, and clarify the task/pledge/approval lifecycle flow with clear status badges and contextual labels throughout the UI.
 
 **Planned changes:**
-- Guard all actor-dependent `useQuery` hooks with `enabled: !!actor` so they do not fire before the actor is initialized.
-- Guard all `useMutation` hooks to check actor availability before invoking backend calls, and show a clear UI message if the actor is unavailable.
-- Disable the "Create Project" button (or show a spinner) while the actor is still initializing to prevent premature mutation calls.
-- Ensure React Query hooks correctly fetch and display all previously stored projects and tasks from the canister after actor initialization.
+- Fix the ProjectDetailsDialog (draft view) so it mounts and renders without errors when triggered from any ProjectCard, for all project statuses (drafting, pledging, active, completed).
+- Add clearly labelled status badges to each TaskCard reflecting the current task state: open, inProgress, completed, approved.
+- Show action buttons on TaskCard only when the task is in the correct state for that action (e.g., "Pledge" only when open, "Approve" only when completed).
+- Add an inline label or tooltip on each TaskCard indicating the next required step (e.g., "Awaiting pledge confirmation by PM").
+- Add status badges to each pledge entry in PledgeSection: Pending, Confirmed, or Expired.
+- Show contextual notes on pledges explaining their meaning (e.g., "Awaiting PM confirmation — not yet counted in budget" for pending; "Confirmed — included in HH budget and payout calculation" for confirmed).
+- Visually de-emphasise expired pledges and label them accordingly.
+- Show PM-only confirm/reject buttons only for pending pledges and only to the PM.
 
-**User-visible outcome:** Users can create projects without encountering an "actor not available" error, and all previously created projects and tasks are visible on the Dashboard immediately after logging in.
+**User-visible outcome:** Users can open project detail dialogs from any ProjectCard without errors, and can clearly understand the current state and next required action for every task and pledge without needing external documentation.

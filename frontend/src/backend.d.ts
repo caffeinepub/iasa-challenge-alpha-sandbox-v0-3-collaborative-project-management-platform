@@ -81,8 +81,10 @@ export interface Project {
     estimatedTotalHH: number;
 }
 export enum PledgeStatus {
+    expired = "expired",
     pending = "pending",
     approved = "approved",
+    confirmed = "confirmed",
     reassigned = "reassigned"
 }
 export enum ProjectStatus {
@@ -99,10 +101,12 @@ export enum SquadRole {
 }
 export enum TaskStatus {
     active = "active",
+    taskConfirmed = "taskConfirmed",
     completed = "completed",
     rejected = "rejected",
     proposed = "proposed",
     inAudit = "inAudit",
+    pendingConfirmation = "pendingConfirmation",
     inProgress = "inProgress"
 }
 export enum UserRole {
@@ -120,8 +124,11 @@ export interface backendInterface {
     approveTask(taskId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     challengeTask(taskId: bigint, stakeHH: number): Promise<void>;
+    checkAndExpireOldPledges(): Promise<void>;
     completeProject(projectId: bigint): Promise<void>;
     completeTask(taskId: bigint): Promise<void>;
+    confirmPledge(pledgeId: bigint): Promise<void>;
+    confirmTask(taskId: bigint): Promise<void>;
     createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null, otherTasksPoolHH: number): Promise<bigint>;
     createTask(projectId: bigint, title: string, description: string, hhBudget: number, dependencies: Array<bigint>): Promise<bigint>;
     getCallerUserProfile(): Promise<UserProfile | null>;
@@ -140,6 +147,5 @@ export interface backendInterface {
     reassignFromOtherTasks(pledgeId: bigint, newTaskId: bigint): Promise<void>;
     registerUser(username: string, role: SquadRole): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    signOffPledge(pledgeId: bigint): Promise<void>;
     vote(targetId: bigint, voteType: Variant_finalPrize_challenge_taskProposal): Promise<void>;
 }

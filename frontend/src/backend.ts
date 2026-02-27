@@ -163,8 +163,10 @@ export interface Project {
     estimatedTotalHH: number;
 }
 export enum PledgeStatus {
+    expired = "expired",
     pending = "pending",
     approved = "approved",
+    confirmed = "confirmed",
     reassigned = "reassigned"
 }
 export enum ProjectStatus {
@@ -181,10 +183,12 @@ export enum SquadRole {
 }
 export enum TaskStatus {
     active = "active",
+    taskConfirmed = "taskConfirmed",
     completed = "completed",
     rejected = "rejected",
     proposed = "proposed",
     inAudit = "inAudit",
+    pendingConfirmation = "pendingConfirmation",
     inProgress = "inProgress"
 }
 export enum UserRole {
@@ -202,8 +206,11 @@ export interface backendInterface {
     approveTask(taskId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     challengeTask(taskId: bigint, stakeHH: number): Promise<void>;
+    checkAndExpireOldPledges(): Promise<void>;
     completeProject(projectId: bigint): Promise<void>;
     completeTask(taskId: bigint): Promise<void>;
+    confirmPledge(pledgeId: bigint): Promise<void>;
+    confirmTask(taskId: bigint): Promise<void>;
     createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null, otherTasksPoolHH: number): Promise<bigint>;
     createTask(projectId: bigint, title: string, description: string, hhBudget: number, dependencies: Array<bigint>): Promise<bigint>;
     getCallerUserProfile(): Promise<UserProfile | null>;
@@ -222,7 +229,6 @@ export interface backendInterface {
     reassignFromOtherTasks(pledgeId: bigint, newTaskId: bigint): Promise<void>;
     registerUser(username: string, role: SquadRole): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    signOffPledge(pledgeId: bigint): Promise<void>;
     vote(targetId: bigint, voteType: Variant_finalPrize_challenge_taskProposal): Promise<void>;
 }
 import type { Pledge as _Pledge, PledgeStatus as _PledgeStatus, PledgeTarget as _PledgeTarget, Project as _Project, ProjectStatus as _ProjectStatus, SquadRole as _SquadRole, Task as _Task, TaskStatus as _TaskStatus, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, Vote as _Vote } from "./declarations/backend.did.d.ts";
@@ -284,6 +290,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async checkAndExpireOldPledges(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.checkAndExpireOldPledges();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.checkAndExpireOldPledges();
+            return result;
+        }
+    }
     async completeProject(arg0: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -309,6 +329,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.completeTask(arg0);
+            return result;
+        }
+    }
+    async confirmPledge(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.confirmPledge(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.confirmPledge(arg0);
+            return result;
+        }
+    }
+    async confirmTask(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.confirmTask(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.confirmTask(arg0);
             return result;
         }
     }
@@ -564,20 +612,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async signOffPledge(arg0: bigint): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.signOffPledge(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.signOffPledge(arg0);
-            return result;
-        }
-    }
     async vote(arg0: bigint, arg1: Variant_finalPrize_challenge_taskProposal): Promise<void> {
         if (this.processError) {
             try {
@@ -810,13 +844,17 @@ function from_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Ui
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
 }
 function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    expired: null;
+} | {
     pending: null;
 } | {
     approved: null;
 } | {
+    confirmed: null;
+} | {
     reassigned: null;
 }): PledgeStatus {
-    return "pending" in value ? PledgeStatus.pending : "approved" in value ? PledgeStatus.approved : "reassigned" in value ? PledgeStatus.reassigned : value;
+    return "expired" in value ? PledgeStatus.expired : "pending" in value ? PledgeStatus.pending : "approved" in value ? PledgeStatus.approved : "confirmed" in value ? PledgeStatus.confirmed : "reassigned" in value ? PledgeStatus.reassigned : value;
 }
 function from_candid_variant_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     task: bigint;
@@ -851,6 +889,8 @@ function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Ui
 function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     active: null;
 } | {
+    taskConfirmed: null;
+} | {
     completed: null;
 } | {
     rejected: null;
@@ -859,9 +899,11 @@ function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Ui
 } | {
     inAudit: null;
 } | {
+    pendingConfirmation: null;
+} | {
     inProgress: null;
 }): TaskStatus {
-    return "active" in value ? TaskStatus.active : "completed" in value ? TaskStatus.completed : "rejected" in value ? TaskStatus.rejected : "proposed" in value ? TaskStatus.proposed : "inAudit" in value ? TaskStatus.inAudit : "inProgress" in value ? TaskStatus.inProgress : value;
+    return "active" in value ? TaskStatus.active : "taskConfirmed" in value ? TaskStatus.taskConfirmed : "completed" in value ? TaskStatus.completed : "rejected" in value ? TaskStatus.rejected : "proposed" in value ? TaskStatus.proposed : "inAudit" in value ? TaskStatus.inAudit : "pendingConfirmation" in value ? TaskStatus.pendingConfirmation : "inProgress" in value ? TaskStatus.inProgress : value;
 }
 function from_candid_variant_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     finalPrize: null;
