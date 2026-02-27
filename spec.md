@@ -1,10 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Enforce a maximum HH budget cap on project pledges, both in the backend and frontend.
+**Goal:** Fix the "actor not available" error when creating a project and restore previously persisted project/task data on the Dashboard after login.
 
 **Planned changes:**
-- Backend: When a pledge is submitted, validate that the sum of all existing approved and pending pledges plus the new pledge amount does not exceed the project's maximum HH budget; reject with a descriptive error if it would.
-- Frontend (PledgeSection): Display the remaining available HH budget (max HH budget minus total already pledged), show an inline error when the entered amount exceeds the remaining budget, disable the pledge form when no budget remains, and show a "Budget fully pledged" message in that case.
+- Guard all actor-dependent `useQuery` hooks with `enabled: !!actor` so they do not fire before the actor is initialized.
+- Guard all `useMutation` hooks to check actor availability before invoking backend calls, and show a clear UI message if the actor is unavailable.
+- Disable the "Create Project" button (or show a spinner) while the actor is still initializing to prevent premature mutation calls.
+- Ensure React Query hooks correctly fetch and display all previously stored projects and tasks from the canister after actor initialization.
 
-**User-visible outcome:** Users can only pledge HH up to the project's remaining budget. Attempting to exceed it is blocked in the UI with a clear error, and the backend also rejects any such pledge as a safeguard.
+**User-visible outcome:** Users can create projects without encountering an "actor not available" error, and all previously created projects and tasks are visible on the Dashboard immediately after logging in.

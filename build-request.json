@@ -1,55 +1,74 @@
 {
   "kind": "build_request",
-  "title": "Enforce maximum HH budget cap on pledges",
-  "priority": "normal",
+  "title": "Fix actor availability error and restore previously generated project/task data",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "In the backend, when a user submits a pledge for a project, validate that the total pledged HH (sum of all existing approved + pending pledges for that project, plus the new pledge amount) does not exceed the project's maximum HH budget. If the new pledge would cause the total to exceed the budget, reject it with a descriptive error message.",
-      "target": "backend",
+      "text": "Fix the 'actor not available' error that occurs when a user attempts to create a project. Ensure the backend actor is fully initialized and available before any mutation calls (createProject, createTask, etc.) are made from the frontend. If the actor is not yet ready, show a loading state or disabled button rather than an error.",
+      "target": "both",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "it is important that pledges can be made only up to the maximum HH budget"
+          "it says 'actor not available' once I want to create a project"
         ]
       },
       "acceptanceCriteria": [
-        "A pledge that would cause total pledged HH to exceed the project's max HH budget is rejected with an error.",
-        "A pledge that fits within the remaining HH budget is accepted normally.",
-        "A pledge of exactly the remaining HH budget is accepted.",
-        "A pledge of zero or negative HH is still rejected by existing validation."
+        "Clicking 'Create Project' no longer produces an 'actor not available' error.",
+        "The create project button is disabled or shows a spinner while the actor is initializing.",
+        "Once the actor is ready, submitting the CreateProjectDialog successfully calls the backend and creates the project."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "In the PledgeSection frontend component, display the remaining available HH budget (max HH budget minus total already pledged HH) and disable or prevent submission of the pledge form when the entered amount exceeds the remaining budget. Show a clear inline error or warning when the user attempts to exceed it.",
+      "text": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard on login. The frontend must not ignore existing backend state — all projects and tasks stored in the canister must be retrieved and rendered correctly after authentication.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "it is important that pledges can be made only up to the maximum HH budget"
+          "The draft ignores all the previous information (project, task) that was generated"
         ]
       },
       "acceptanceCriteria": [
-        "The pledge input field shows the maximum allowed value (remaining HH budget).",
-        "Submitting a pledge amount greater than the remaining budget is blocked in the UI with a visible error message.",
-        "The remaining budget is recalculated and displayed correctly after each new pledge is approved or added.",
-        "When the project has no remaining HH budget, the pledge form is disabled and shows a 'Budget fully pledged' message."
+        "After logging in, the Dashboard displays all previously created projects from the backend.",
+        "Existing tasks within each project are visible in the ProjectDetailsDialog.",
+        "No previously stored project or task data is missing or blank after a fresh login.",
+        "React Query hooks correctly invalidate and refetch project and task data after actor initialization."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Ensure the useActor hook and all dependent React Query hooks (useQueries.ts) wait for the actor to be fully available before executing queries or mutations. Guard all actor-dependent query functions so they are only called when the actor instance is non-null, preventing race conditions on initial load.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-4"
+        ],
+        "quotes": [
+          "actor not available",
+          "The draft ignores all the previous information"
+        ]
+      },
+      "acceptanceCriteria": [
+        "All useQuery hooks that depend on the actor have enabled: !!actor guards so they do not fire before the actor is ready.",
+        "All useMutation hooks check actor availability before invoking backend calls and surface a clear UI message if the actor is unavailable.",
+        "No console errors related to null actor calls appear during normal app use."
       ]
     }
   ],
   "constraints": [
-    "Do not change the project creation or task creation budget validation logic.",
-    "All Motoko logic must remain in the single main actor (backend/main.mo)."
+    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, or frontend/src/main.tsx (immutable paths).",
+    "Do not change the backend data model or existing canister state — only fix frontend actor initialization and data fetching issues.",
+    "All Motoko logic must remain in the single main actor file backend/main.mo."
   ],
   "nonGoals": [
-    "Changing how the HH budget itself is set during project creation.",
-    "Adding voting or reputation logic.",
-    "Modifying task-level budget enforcement."
+    "Adding new features or changing existing RBAC logic.",
+    "Redesigning the UI or changing the visual theme.",
+    "Migrating or resetting canister state."
   ],
   "imageRequirements": {
     "required": [],

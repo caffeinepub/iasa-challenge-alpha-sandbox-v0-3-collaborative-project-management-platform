@@ -14,10 +14,10 @@ export default function ShareOfPoolSection({ project }: ShareOfPoolSectionProps)
 
   // Calculate total earned HH and individual shares
   const completedTasks = tasks.filter((task) => task.status === 'completed');
-  
+
   // Group tasks by assignee and calculate earned HH
   const participantEarnings = new Map<string, number>();
-  
+
   completedTasks.forEach((task) => {
     if (task.assignee) {
       const assigneeStr = task.assignee.toString();
@@ -26,20 +26,29 @@ export default function ShareOfPoolSection({ project }: ShareOfPoolSectionProps)
     }
   });
 
-  const totalEarnedHH = Array.from(participantEarnings.values()).reduce((sum, hh) => sum + hh, 0);
+  const totalEarnedHH = Array.from(participantEarnings.values()).reduce(
+    (sum, hh) => sum + hh,
+    0
+  );
 
   // Calculate share of pool for each participant
-  const participantShares = Array.from(participantEarnings.entries()).map(([principal, earnedHH]) => {
-    const sharePercentage = totalEarnedHH > 0 ? (earnedHH / totalEarnedHH) * 100 : 0;
-    const payoutCLP = totalEarnedHH > 0 ? (earnedHH / totalEarnedHH) * project.finalMonetaryValue : 0;
-    
-    return {
-      principal,
-      earnedHH,
-      sharePercentage,
-      payoutCLP,
-    };
-  });
+  const participantShares = Array.from(participantEarnings.entries()).map(
+    ([principal, earnedHH]) => {
+      const sharePercentage =
+        totalEarnedHH > 0 ? (earnedHH / totalEarnedHH) * 100 : 0;
+      const payoutCLP =
+        totalEarnedHH > 0
+          ? (earnedHH / totalEarnedHH) * project.finalMonetaryValue
+          : 0;
+
+      return {
+        principal,
+        earnedHH,
+        sharePercentage,
+        payoutCLP,
+      };
+    }
+  );
 
   // Sort by earned HH descending
   participantShares.sort((a, b) => b.earnedHH - a.earnedHH);
@@ -50,7 +59,8 @@ export default function ShareOfPoolSection({ project }: ShareOfPoolSectionProps)
         <CardHeader>
           <CardTitle>Share of Pool Distribution</CardTitle>
           <CardDescription>
-            Projected payouts based on earned Human Hours. Total pool: ${project.finalMonetaryValue.toFixed(2)} CLP
+            Projected payouts based on earned Human Hours. Total pool: $
+            {project.finalMonetaryValue.toFixed(2)} CLP
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -63,7 +73,7 @@ export default function ShareOfPoolSection({ project }: ShareOfPoolSectionProps)
                 <span className="w-24 text-right">Payout (CLP)</span>
               </div>
             </div>
-            
+
             {participantShares.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center">
                 <p className="text-muted-foreground">No completed tasks yet</p>
@@ -89,7 +99,9 @@ export default function ShareOfPoolSection({ project }: ShareOfPoolSectionProps)
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total Pool Value</span>
-              <span className="font-semibold">${project.finalMonetaryValue.toFixed(2)} CLP</span>
+              <span className="font-semibold">
+                ${project.finalMonetaryValue.toFixed(2)} CLP
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Active Participants</span>
@@ -102,28 +114,22 @@ export default function ShareOfPoolSection({ project }: ShareOfPoolSectionProps)
   );
 }
 
-function ParticipantShareRow({ share }: { share: any }) {
+function ParticipantShareRow({ share }: { share: { principal: string; earnedHH: number; sharePercentage: number; payoutCLP: number } }) {
   const { data: userProfile } = useGetUserProfile(share.principal);
-
-  const getSquadRoleLabel = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-  };
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-3">
       <div className="flex items-center gap-3">
         <Avatar className="h-8 w-8">
-          <AvatarFallback>
-            {share.principal.slice(0, 2).toUpperCase()}
-          </AvatarFallback>
+          <AvatarFallback>{share.principal.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div>
           <div className="text-sm font-medium">
-            {share.principal.slice(0, 8)}...
+            {userProfile?.friendlyUsername || `${share.principal.slice(0, 8)}...`}
           </div>
           {userProfile && (
             <Badge variant="secondary" className="text-xs mt-1">
-              {getSquadRoleLabel(userProfile.squadRole)}
+              {userProfile.squadRole}
             </Badge>
           )}
         </div>

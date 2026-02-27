@@ -1,22 +1,99 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Enforce maximum HH budget cap on pledges",
+  "title": "Fix actor availability error and restore previously generated project/task data",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Display remaining HH budget in PledgeSection and prevent pledges that exceed the project's maximum HH budget",
+      "id": "REQ-1",
+      "summary": "Fix the 'actor not available' error when creating a project by ensuring the backend actor is fully initialized before mutation calls, showing a loading state or disabled button when the actor is not ready.",
       "acceptanceCriteria": [
-        "The pledge input field shows the maximum allowed value (remaining HH budget).",
-        "Submitting a pledge amount greater than the remaining budget is blocked in the UI with a visible error message.",
-        "The remaining budget is recalculated and displayed correctly after each new pledge is approved or added.",
-        "When the project has no remaining HH budget, the pledge form is disabled and shows a 'Budget fully pledged' message."
+        "Clicking 'Create Project' no longer produces an 'actor not available' error.",
+        "The create project button is disabled or shows a spinner while the actor is initializing.",
+        "Once the actor is ready, submitting the CreateProjectDialog successfully calls the backend and creates the project."
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/CreateProjectDialog.tsx",
+          "operation": "modify",
+          "description": "Add actor availability check from useActor hook (isFetching state) to disable the submit button and show a loading indicator while the actor is initializing. Ensure the dialog only allows submission when actor is non-null and not fetching. Add user-facing feedback (e.g., 'Connecting to backend...') when actor is unavailable."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add actor null-check guards to the useCreateProject mutation's mutationFn to prevent execution when actor is unavailable. Throw a clear error message if actor is null at invocation time, ensuring the UI can surface this gracefully."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard after login, ensuring the frontend retrieves all existing backend state correctly.",
+      "acceptanceCriteria": [
+        "After logging in, the Dashboard displays all previously created projects from the backend.",
+        "Existing tasks within each project are visible in the ProjectDetailsDialog.",
+        "No previously stored project or task data is missing or blank after a fresh login.",
+        "React Query hooks correctly invalidate and refetch project and task data after actor initialization."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Ensure useGetProjects query includes enabled: !!actor guard so it does not fire before the actor is ready. Verify that queryKey is stable and that the query refetches automatically when actor becomes available. Remove any stale-time or cache-time settings that might prevent fresh data fetches on login."
+        },
+        {
+          "path": "frontend/src/components/Dashboard.tsx",
+          "operation": "modify",
+          "description": "Ensure the Dashboard correctly waits for useGetProjects to fetch all projects after the actor initializes. Show a loading spinner or skeleton while projects are being fetched. Verify that the projects list is not filtered or hidden inadvertently by local state or empty checks that ignore backend data."
+        },
+        {
+          "path": "frontend/src/components/ProjectDetailsDialog.tsx",
+          "operation": "modify",
+          "description": "Ensure useGetTasks query for a given projectId includes enabled: !!actor guard and only fires when the dialog is open and actor is ready. Verify that task data refetches correctly when the dialog is opened and actor is available, displaying all existing tasks from the backend."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Ensure the useActor hook and all dependent React Query hooks wait for the actor to be fully available before executing queries or mutations, preventing race conditions on initial load.",
+      "acceptanceCriteria": [
+        "All useQuery hooks that depend on the actor have enabled: !!actor guards so they do not fire before the actor is ready.",
+        "All useMutation hooks check actor availability before invoking backend calls and surface a clear UI message if the actor is unavailable.",
+        "No console errors related to null actor calls appear during normal app use."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Audit all useQuery hooks (useGetProjects, useGetTasks, useGetPledges, useGetPeerRatings, useGetVotes, useGetChallenges, useGetCallerUserProfile) to ensure each has enabled: !!actor && !actorFetching guards. Audit all useMutation hooks (useCreateProject, useCreateTask, usePledgeToTask, useAcceptTask, useCompleteTask, useApproveTask, useChallengeTask, useVote, useSignOffPledge, useReassignFromOtherTasks, useRatePeer, useCompleteProject, useRegisterUser, useSaveCallerUserProfile) to add actor null-checks in their mutationFn before invoking backend methods, throwing descriptive errors if actor is unavailable."
+        },
+        {
+          "path": "frontend/src/components/MainApp.tsx",
+          "operation": "modify",
+          "description": "Ensure MainApp waits for actor initialization to complete before rendering the Dashboard. Show a loading spinner or initialization message while actorFetching is true. Only render the main app UI once actor is available and authentication state is determined, preventing premature queries."
+        },
+        {
+          "path": "frontend/src/components/TaskCard.tsx",
+          "operation": "modify",
+          "description": "Add actor availability checks to all action buttons (accept, complete, approve, challenge, pledge) by checking the actor state from useActor. Disable buttons and show a tooltip or inline message when actor is not ready, preventing users from triggering mutations before the backend is available."
+        },
+        {
           "path": "frontend/src/components/PledgeSection.tsx",
           "operation": "modify",
-          "description": "Calculate and display the remaining HH budget (project.estimatedTotalHH minus project.totalPledgedHH). Add validation to the pledge form that prevents submission when the entered amount exceeds the remaining budget. Show an inline error message when the user attempts to exceed the remaining budget. Disable the pledge form entirely when remaining budget is zero or negative, displaying 'Budget fully pledged' message. Update the UI to prominently show the remaining budget available for pledging near the pledge input field."
+          "description": "Add actor availability checks to the pledge form and sign-off buttons. Disable pledge submission and sign-off actions while actor is initializing, showing user-facing feedback (e.g., 'Backend initializing...'). Ensure mutations are only triggered when actor is non-null."
+        },
+        {
+          "path": "frontend/src/components/PeerRatingSection.tsx",
+          "operation": "modify",
+          "description": "Add actor availability check to the peer rating form. Disable the submit button and show a loading indicator while actor is initializing. Ensure the useRatePeer mutation only fires when actor is available."
+        },
+        {
+          "path": "frontend/src/components/CompleteProjectButton.tsx",
+          "operation": "modify",
+          "description": "Add actor availability check from useActor to disable the complete project button while actor is initializing. Show a loading spinner or tooltip indicating the backend is connecting if actor is unavailable."
+        },
+        {
+          "path": "frontend/src/components/ProfileSetupModal.tsx",
+          "operation": "modify",
+          "description": "Add actor availability check to the profile setup form. Disable the submit button and show a loading indicator while actor is initializing. Ensure the useRegisterUser mutation only fires when actor is available, preventing registration errors on first login."
         }
       ]
     }

@@ -1,11 +1,11 @@
 import { Project } from '../backend';
-import { useGetPledges } from '../hooks/useQueries';
+import { useGetPledges, useGetCallerUserProfile } from '../hooks/useQueries';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { DollarSign, Clock, Users, ExternalLink, Info, CheckCircle, Zap } from 'lucide-react';
+import { DollarSign, Clock, Users, ExternalLink, Info, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import PledgeSection from './PledgeSection';
@@ -21,6 +21,7 @@ interface ProjectDetailsDialogProps {
 
 export default function ProjectDetailsDialog({ project, open, onOpenChange }: ProjectDetailsDialogProps) {
   const { data: pledges = [] } = useGetPledges(project.id);
+  const { data: userProfile } = useGetCallerUserProfile();
   const { identity } = useInternetIdentity();
 
   const isCreator = identity?.getPrincipal().toString() === project.creator.toString();
@@ -32,7 +33,9 @@ export default function ProjectDetailsDialog({ project, open, onOpenChange }: Pr
     ? Math.min((totalApprovedHH / project.estimatedTotalHH) * 100, 100)
     : 0;
 
-  const payoutPerHH = project.estimatedTotalHH > 0 ? project.finalMonetaryValue / project.estimatedTotalHH : 0;
+  const payoutPerHH = project.estimatedTotalHH > 0
+    ? project.finalMonetaryValue / project.estimatedTotalHH
+    : 0;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -177,11 +180,11 @@ export default function ProjectDetailsDialog({ project, open, onOpenChange }: Pr
           </TabsList>
 
           <TabsContent value="tasks" className="mt-4">
-            <TasksSection project={project} />
+            <TasksSection project={project} userProfile={userProfile ?? null} />
           </TabsContent>
 
           <TabsContent value="pledges" className="mt-4">
-            <PledgeSection project={project} />
+            <PledgeSection project={project} userProfile={userProfile ?? null} />
           </TabsContent>
 
           <TabsContent value="payouts" className="mt-4">

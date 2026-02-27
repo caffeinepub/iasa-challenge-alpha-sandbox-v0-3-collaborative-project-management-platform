@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Task, Project, Pledge } from '../backend';
+import { Task, Project, Pledge, SquadRole } from '../backend';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { useAcceptTask, useCompleteTask, useApproveTask, useChallengeTask, usePledgeToTask } from '../hooks/useQueries';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,17 +7,26 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Clock, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Clock, AlertCircle, AlertTriangle, ShieldCheck, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TaskCardProps {
   task: Task;
   project: Project;
   pledges?: Pledge[];
+  isCreator?: boolean;
   remainingBudget?: number;
+  userProfile?: { squadRole: SquadRole; friendlyUsername: string } | null;
 }
 
-export default function TaskCard({ task, project, pledges = [], remainingBudget }: TaskCardProps) {
+export default function TaskCard({
+  task,
+  project,
+  pledges = [],
+  isCreator = false,
+  remainingBudget,
+  userProfile = null,
+}: TaskCardProps) {
   const { identity } = useInternetIdentity();
   const [pledgeAmount, setPledgeAmount] = useState('');
   const [pledgeError, setPledgeError] = useState('');
@@ -27,16 +36,17 @@ export default function TaskCard({ task, project, pledges = [], remainingBudget 
   const challengeTask = useChallengeTask();
   const pledgeToTask = usePledgeToTask();
 
-  const isCreator = identity?.getPrincipal().toString() === project.creator.toString();
-  const isAssignee = task.assignee?.toString() === identity?.getPrincipal().toString();
+  const currentUserPrincipal = identity?.getPrincipal().toString();
+  const isAssignee = task.assignee?.toString() === currentUserPrincipal;
   const isParticipant =
     isCreator ||
-    project.participants.some((p) => p.toString() === identity?.getPrincipal().toString());
+    project.participants.some((p) => p.toString() === currentUserPrincipal);
 
   // Pledges for this specific task
-  const taskPledges = pledges.filter(
-    (p) => p.target.__kind__ === 'task' && (p.target as any).task?.toString() === task.id.toString()
-  );
+  const taskPledges = pledges.filter((p) => {
+    if (p.target.__kind__ !== 'task') return false;
+    return (p.target as { __kind__: 'task'; task: bigint }).task.toString() === task.id.toString();
+  });
   const approvedPledgedHH = taskPledges
     .filter((p) => p.status === 'approved')
     .reduce((sum, p) => sum + p.amount, 0);
@@ -47,6 +57,27 @@ export default function TaskCard({ task, project, pledges = [], remainingBudget 
   // Determine effective max for this pledge input
   const effectiveMax = remainingBudget !== undefined ? remainingBudget : Infinity;
   const isBudgetFull = remainingBudget !== undefined && remainingBudget <= 0;
+
+  // PM-only: confirm HH / approve task (creator only)
+  const canApprove = isCreator && task.status === 'inAudit';
+
+  // Mentor sign-off: only Mentors who have pledged to this project/task
+  const isMentor = userProfile?.squadRole === 'Mentor';
+  const userPledgesForProject = pledges.filter(
+    (p) =>
+      p.user.toString() === currentUserPrincipal &&
+      (p.status === 'approved' || p.status === 'pending' || p.status === 'reassigned')
+  );
+  const hasPledgedToThisTask = userPledgesForProject.some((p) => {
+    if (p.target.__kind__ !== 'task') return false;
+    return (p.target as { __kind__: 'task'; task: bigint }).task.toString() === task.id.toString();
+  });
+  const hasPledgedToProject = userPledgesForProject.length > 0;
+  const canSignOff =
+    isMentor &&
+    (hasPledgedToThisTask || hasPledgedToProject) &&
+    task.status === 'inAudit' &&
+    !isCreator; // don't show both buttons; PM button takes precedence
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -138,11 +169,18 @@ export default function TaskCard({ task, project, pledges = [], remainingBudget 
     }
   };
 
-  const canAccept = isParticipant && (task.status === 'proposed' || task.status === 'active') && !task.assignee;
+  // Any authenticated user can accept/challenge; assignee can complete
+  const canAccept =
+    !!currentUserPrincipal &&
+    (task.status === 'proposed' || task.status === 'active') &&
+    !task.assignee;
   const canComplete = isAssignee && task.status === 'inProgress';
-  const canApprove = isCreator && task.status === 'inAudit';
   const canChallenge = isParticipant && !isAssignee && task.status === 'inAudit';
-  const canPledge = isParticipant && (project.status === 'pledging' || project.status === 'active');
+
+  // Pledge: any authenticated user can pledge when project is in pledging/active phase
+  const canPledge =
+    !!currentUserPrincipal &&
+    (project.status === 'pledging' || project.status === 'active');
 
   return (
     <Card>
@@ -186,7 +224,7 @@ export default function TaskCard({ task, project, pledges = [], remainingBudget 
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             {canAccept && (
               <Button size="sm" onClick={handleAccept} disabled={acceptTask.isPending}>
                 {acceptTask.isPending ? 'Accepting...' : 'Accept'}
@@ -197,9 +235,28 @@ export default function TaskCard({ task, project, pledges = [], remainingBudget 
                 {completeTask.isPending ? 'Completing...' : 'Complete'}
               </Button>
             )}
+            {/* PM-only: Confirm HH & approve task */}
             {canApprove && (
-              <Button size="sm" onClick={handleApprove} disabled={approveTask.isPending}>
-                {approveTask.isPending ? 'Approving...' : 'Approve'}
+              <Button
+                size="sm"
+                onClick={handleApprove}
+                disabled={approveTask.isPending}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <ShieldCheck className="mr-1 h-3 w-3" />
+                {approveTask.isPending ? 'Approving...' : 'Confirm HH (PM)'}
+              </Button>
+            )}
+            {/* Mentor-only: Sign off task (only if pledged to project/task) */}
+            {canSignOff && (
+              <Button
+                size="sm"
+                onClick={handleApprove}
+                disabled={approveTask.isPending}
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                <Star className="mr-1 h-3 w-3" />
+                {approveTask.isPending ? 'Signing off...' : 'Sign Off (Mentor)'}
               </Button>
             )}
             {canChallenge && (
@@ -215,7 +272,7 @@ export default function TaskCard({ task, project, pledges = [], remainingBudget 
           </div>
         </div>
 
-        {/* Pledge to this task */}
+        {/* Pledge to this task — visible to all authenticated users */}
         {canPledge && (
           <div className="space-y-1 pt-1 border-t">
             {isBudgetFull ? (

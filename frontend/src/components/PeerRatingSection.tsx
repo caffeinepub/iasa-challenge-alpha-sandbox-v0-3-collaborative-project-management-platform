@@ -59,30 +59,34 @@ export default function PeerRatingSection({ project }: PeerRatingSectionProps) {
     }
   };
 
-  const getSquadRoleLabel = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-  };
-
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Rate Project Participants</CardTitle>
           <CardDescription>
-            Rate your fellow participants' contributions. You have 7 days after project completion. Mentor ratings carry 3x weight.
+            Rate your fellow participants' contributions. You have 7 days after project completion.
+            Mentor ratings carry 3x weight.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="peer">Select Participant</Label>
-              <Select value={selectedPeer} onValueChange={setSelectedPeer} disabled={ratePeer.isPending}>
+              <Select
+                value={selectedPeer}
+                onValueChange={setSelectedPeer}
+                disabled={ratePeer.isPending}
+              >
                 <SelectTrigger id="peer">
                   <SelectValue placeholder="Choose a participant to rate" />
                 </SelectTrigger>
                 <SelectContent>
                   {otherParticipants.map((participant) => (
-                    <ParticipantOption key={participant.toString()} principal={participant.toString()} />
+                    <ParticipantOption
+                      key={participant.toString()}
+                      principal={participant.toString()}
+                    />
                   ))}
                 </SelectContent>
               </Select>
@@ -132,17 +136,13 @@ export default function PeerRatingSection({ project }: PeerRatingSectionProps) {
 function ParticipantOption({ principal }: { principal: string }) {
   const { data: userProfile } = useGetUserProfile(principal);
 
-  const getSquadRoleLabel = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-  };
-
   return (
     <SelectItem value={principal}>
       <div className="flex items-center gap-2">
         <span>{principal.slice(0, 16)}...</span>
         {userProfile && (
           <Badge variant="secondary" className="text-xs">
-            {getSquadRoleLabel(userProfile.squadRole)}
+            {userProfile.squadRole}
           </Badge>
         )}
       </div>
@@ -154,10 +154,6 @@ function RatingRow({ rating }: { rating: any }) {
   const { data: raterProfile } = useGetUserProfile(rating.rater.toString());
   const { data: rateeProfile } = useGetUserProfile(rating.ratee.toString());
 
-  const getSquadRoleLabel = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-  };
-
   return (
     <div className="flex items-center justify-between rounded-lg border p-3">
       <div className="flex items-center gap-3">
@@ -167,18 +163,18 @@ function RatingRow({ rating }: { rating: any }) {
           </AvatarFallback>
         </Avatar>
         <div className="text-sm">
-          <div className="font-medium flex items-center gap-2">
-            <span>{rating.rater.toString().slice(0, 8)}...</span>
+          <div className="font-medium flex items-center gap-2 flex-wrap">
+            <span>{raterProfile?.friendlyUsername || `${rating.rater.toString().slice(0, 8)}...`}</span>
             {raterProfile && (
               <Badge variant="secondary" className="text-xs">
-                {getSquadRoleLabel(raterProfile.squadRole)}
+                {raterProfile.squadRole}
               </Badge>
             )}
             <span className="text-muted-foreground">rated</span>
-            <span>{rating.ratee.toString().slice(0, 8)}...</span>
+            <span>{rateeProfile?.friendlyUsername || `${rating.ratee.toString().slice(0, 8)}...`}</span>
             {rateeProfile && (
               <Badge variant="secondary" className="text-xs">
-                {getSquadRoleLabel(rateeProfile.squadRole)}
+                {rateeProfile.squadRole}
               </Badge>
             )}
           </div>

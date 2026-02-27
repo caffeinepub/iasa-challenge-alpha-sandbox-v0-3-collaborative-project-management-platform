@@ -1,26 +1,41 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-26T20:32:30.137Z",
-  "summary": "The diff implements both REQ-1 (backend validation) and REQ-2 (frontend PledgeSection + TaskCard/TasksSection enforcement). Backend main.mo includes pledge budget cap validation. Frontend PledgeSection.tsx computes remainingBudget and shows isBudgetFull state. TaskCard.tsx and TasksSection.tsx also propagate remainingBudget and show inline errors and disabled states. All major acceptance criteria appear addressed, though the backend truncation prevents full confirmation of the exact error message wording.",
-  "missing_requirements": [],
-  "hallucinated_features": [
+  "generatedAt": "2026-02-27T19:45:02.893Z",
+  "summary": "The diff implements fixes for actor availability and data loading issues. REQ-1 is well addressed with disabled buttons and spinner states in CreateProjectDialog and MainApp. REQ-3 is partially addressed via actor readiness checks in components. However, the critical useQueries.ts file is not present in the diff, so we cannot confirm that enabled: !!actor guards were added to useQuery hooks, that React Query cache invalidation/refetch after actor initialization was implemented, or that useMutation hooks surface clear UI messages for actor unavailability.",
+  "missing_requirements": [
     {
-      "description": "Budget cap enforcement in TaskCard and TasksSection pledge forms (task-level pledge inputs also receive remainingBudget and enforce the cap with inline errors and disabled states)",
-      "reason": "REQ-2 specifically targets the PledgeSection frontend component. The diff also applies the same budget cap UI logic to TaskCard.tsx and TasksSection.tsx, which was not requested and contradicts the non-goal of not modifying task-level budget enforcement.",
+      "id": "REQ-2",
+      "requirement": "React Query hooks correctly invalidate and refetch project and task data after actor initialization.",
+      "reason": "The useQueries.ts file is not shown in the diff. There is no evidence that query invalidation or refetch-on-actor-ready logic was added to the hooks themselves. Dashboard and MainApp changes alone do not confirm this AC is met.",
       "evidence": [
-        "frontend/src/components/TaskCard.tsx",
-        "frontend/src/components/TasksSection.tsx"
+        "frontend/src/components/Dashboard.tsx",
+        "frontend/src/components/MainApp.tsx"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "requirement": "All useQuery hooks that depend on the actor have enabled: !!actor guards so they do not fire before the actor is ready.",
+      "reason": "The useQueries.ts file is not included in the diff. Without seeing it, there is no evidence that enabled: !!actor guards were added to the query hooks.",
+      "evidence": []
+    },
+    {
+      "id": "REQ-3",
+      "requirement": "All useMutation hooks check actor availability before invoking backend calls and surface a clear UI message if the actor is unavailable.",
+      "reason": "The useQueries.ts file is not present in the diff. CreateProjectDialog checks actor readiness at the component level, but the mutation hooks themselves in useQueries.ts are not shown to include actor availability checks with clear UI messaging.",
+      "evidence": [
+        "frontend/src/components/CreateProjectDialog.tsx"
       ]
     }
   ],
-  "confidence": 0.78,
+  "hallucinated_features": [],
+  "confidence": 0.72,
   "changed_files": [
     "backend/main.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/PledgeSection.tsx",
-    "frontend/src/components/TaskCard.tsx",
-    "frontend/src/components/TasksSection.tsx",
+    "frontend/src/components/CreateProjectDialog.tsx",
+    "frontend/src/components/Dashboard.tsx",
+    "frontend/src/components/MainApp.tsx",
     "project_state.json"
   ]
 }

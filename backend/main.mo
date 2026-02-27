@@ -210,6 +210,33 @@ actor IASAChallenge {
     ) != null;
   };
 
+  // Check whether a user has pledged to a specific project (any target within that project)
+  private func hasPledgedToProject(user : Principal, projectId : Nat) : Bool {
+    let allPledges = Iter.toArray(natMap.vals(pledges));
+    Array.find<Pledge>(
+      allPledges,
+      func(p) {
+        p.user == user and p.projectId == projectId and (p.status == #approved or p.status == #pending or p.status == #reassigned);
+      },
+    ) != null;
+  };
+
+  // Check whether a user has pledged to a specific task within a project
+  private func hasPledgedToTask(user : Principal, projectId : Nat, taskId : Nat) : Bool {
+    let allPledges = Iter.toArray(natMap.vals(pledges));
+    Array.find<Pledge>(
+      allPledges,
+      func(p) {
+        p.user == user and p.projectId == projectId and (p.status == #approved or p.status == #pending or p.status == #reassigned) and (
+          switch (p.target) {
+            case (#task tid) { tid == taskId };
+            case (#otherTasks) { false };
+          }
+        );
+      },
+    ) != null;
+  };
+
   // Profile functions
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
@@ -220,11 +247,9 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    // Must be an authenticated user first
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Debug.trap("Unauthorized: Only authenticated users can view profiles");
     };
-    // Can only view own profile unless admin
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
       Debug.trap("Unauthorized: Can only view your own profile");
     };
@@ -264,9 +289,10 @@ actor IASAChallenge {
 
   // Project functions
 
+  // Any signed-in participant (registered user) may create a project.
   public shared ({ caller }) func createProject(title : Text, description : Text, estimatedTotalHH : Float, finalMonetaryValue : Float, sharedResourceLink : ?Text, otherTasksPoolHH : Float) : async Nat {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can create projects");
+      Debug.trap("Unauthorized: Only signed-in participants can create projects");
     };
 
     if (estimatedTotalHH <= 0.0) {
@@ -319,18 +345,18 @@ actor IASAChallenge {
     projectId;
   };
 
+  // Any signed-in participant may create tasks in a project that is in pledging or active phase.
   public shared ({ caller }) func createTask(projectId : Nat, title : Text, description : Text, hhBudget : Float, dependencies : [Nat]) : async Nat {
-    // Must be an authenticated user
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can create tasks");
+      Debug.trap("Unauthorized: Only signed-in participants can create tasks");
     };
 
     switch (natMap.get(projects, projectId)) {
       case null { Debug.trap("Project not found") };
       case (?project) {
-        // PM only: must be project creator or admin
-        if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
-          Debug.trap("Unauthorized: Only project creator (PM) can create tasks");
+        // Tasks may only be defined while the project is in pledging or active phase
+        if (project.status != #pledging and project.status != #active) {
+          Debug.trap("Tasks can only be created for projects in pledging or active phase");
         };
 
         if (hhBudget <= 0.0) {
@@ -389,9 +415,10 @@ actor IASAChallenge {
 
   // Pledge functions
 
+  // Any signed-in participant may pledge HH to any project or task.
   public shared ({ caller }) func pledgeToTask(projectId : Nat, target : PledgeTarget, amount : Float) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can pledge to tasks");
+      Debug.trap("Unauthorized: Only signed-in participants can pledge");
     };
 
     if (amount <= 0.0) {
@@ -516,10 +543,10 @@ actor IASAChallenge {
     };
   };
 
+  // Only the Project Manager (PM / creator) of a project may confirm HH (sign off pledges).
   public shared ({ caller }) func signOffPledge(pledgeId : Nat) : async () {
-    // Must be an authenticated user
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can sign off pledges");
+      Debug.trap("Unauthorized: Only signed-in users can sign off pledges");
     };
 
     switch (natMap.get(pledges, pledgeId)) {
@@ -528,9 +555,9 @@ actor IASAChallenge {
         switch (natMap.get(projects, pledge.projectId)) {
           case null { Debug.trap("Project not found") };
           case (?project) {
-            // PM only: must be project creator or admin
-            if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
-              Debug.trap("Unauthorized: Only project creator (PM) can sign off pledges");
+            // Only the PM (project creator) may confirm HH
+            if (caller != project.creator) {
+              Debug.trap("Unauthorized: Only the Project Manager (creator) can confirm HH and sign off pledges");
             };
 
             if (pledge.status != #pending) {
@@ -544,7 +571,6 @@ actor IASAChallenge {
 
             pledges := natMap.put(pledges, pledgeId, approvedPledge);
 
-            // Check project activation after every sign-off
             updateProjectStatus(pledge.projectId);
           };
         };
@@ -552,10 +578,10 @@ actor IASAChallenge {
     };
   };
 
+  // Only the Project Manager (PM / creator) may reassign from Other Tasks pool.
   public shared ({ caller }) func reassignFromOtherTasks(pledgeId : Nat, newTaskId : Nat) : async () {
-    // Must be an authenticated user
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can reassign from Other Tasks pool");
+      Debug.trap("Unauthorized: Only signed-in users can reassign from Other Tasks pool");
     };
 
     switch (natMap.get(pledges, pledgeId)) {
@@ -566,9 +592,9 @@ actor IASAChallenge {
             switch (natMap.get(projects, pledge.projectId)) {
               case null { Debug.trap("Project not found") };
               case (?project) {
-                // PM only: must be project creator or admin
-                if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
-                  Debug.trap("Unauthorized: Only project creator (PM) can reassign from Other Tasks pool");
+                // Only the PM (project creator) may reassign
+                if (caller != project.creator) {
+                  Debug.trap("Unauthorized: Only the Project Manager (creator) can reassign from Other Tasks pool");
                 };
 
                 switch (natMap.get(tasks, newTaskId)) {
@@ -692,21 +718,34 @@ actor IASAChallenge {
     };
   };
 
+  // Only a Mentor who has already pledged HH to the specific project or task may approve (sign off) a task.
   public shared ({ caller }) func approveTask(taskId : Nat) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can approve tasks");
+      Debug.trap("Unauthorized: Only signed-in users can approve tasks");
     };
 
     switch (natMap.get(tasks, taskId)) {
       case null { Debug.trap("Task not found") };
       case (?task) {
-        switch (natMap.get(projects, task.projectId)) {
-          case null { Debug.trap("Project not found") };
-          case (?project) {
-            if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
-              Debug.trap("Unauthorized: Only project creator or admin can approve tasks");
-            };
+        // Caller must be a Mentor
+        let callerProfile = switch (principalMap.get(userProfiles, caller)) {
+          case null { Debug.trap("User profile not found: only a Mentor who has pledged may sign off tasks") };
+          case (?profile) { profile };
+        };
+
+        switch (callerProfile.squadRole) {
+          case (#Mentor) { /* allowed role */ };
+          case (_) {
+            Debug.trap("Unauthorized: Only a Mentor may sign off (approve) a task");
           };
+        };
+
+        // Caller must have pledged to this project or specifically to this task
+        let pledgedToProject = hasPledgedToProject(caller, task.projectId);
+        let pledgedToThisTask = hasPledgedToTask(caller, task.projectId, taskId);
+
+        if (not pledgedToProject and not pledgedToThisTask) {
+          Debug.trap("Unauthorized: Only a Mentor who has pledged HH to this project or task may sign off the task");
         };
 
         if (task.status != #inAudit) {
@@ -834,7 +873,7 @@ actor IASAChallenge {
               Debug.trap("Unauthorized: Only project participants can vote on task proposals");
             };
             if (task.status != #proposed) {
-              Debug.trap("Task is not in proposed status");
+              Debug.trap("Task is not proposed for voting");
             };
           };
         };
@@ -862,7 +901,7 @@ actor IASAChallenge {
               Debug.trap("Unauthorized: Only project participants can vote on final prize distribution");
             };
             if (project.status != #completed) {
-              Debug.trap("Project is not completed");
+              Debug.trap("Project is not completed for final prize voting");
             };
           };
         };
@@ -899,7 +938,7 @@ actor IASAChallenge {
       case null { Debug.trap("Project not found") };
       case (?project) {
         if (project.status != #completed) {
-          Debug.trap("Project is not completed");
+          Debug.trap("Project is not completed for rating");
         };
 
         if (not isProjectParticipant(projectId, caller)) {
@@ -1000,16 +1039,18 @@ actor IASAChallenge {
     };
   };
 
+  // Only the PM (project creator) may mark a project as completed.
   public shared ({ caller }) func completeProject(projectId : Nat) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can complete projects");
+      Debug.trap("Unauthorized: Only signed-in users can complete projects");
     };
 
     switch (natMap.get(projects, projectId)) {
       case null { Debug.trap("Project not found") };
       case (?project) {
-        if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
-          Debug.trap("Unauthorized: Only project creator or admin can complete project");
+        // Only the PM (project creator) may complete the project
+        if (caller != project.creator) {
+          Debug.trap("Unauthorized: Only the Project Manager (creator) can complete the project");
         };
 
         if (project.status != #active) {
@@ -1094,3 +1135,4 @@ actor IASAChallenge {
     Array.filter<Challenge>(allChallenges, func(challenge) { challenge.taskId == taskId });
   };
 };
+

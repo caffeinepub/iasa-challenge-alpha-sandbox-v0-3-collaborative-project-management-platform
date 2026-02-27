@@ -2,10 +2,29 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-in-the-pledgesection-frontend-component-display-the-remaining-available-hh-budget-max-hh-budget-minus-total-already-pledged-hh-and-disable-or-prevent-submission-of-the-pledge-form-when-the-entered-amount-exceeds-the-remaining-budget-show-a-clear-inline-error-or-warning-when-the-user-attempts-to-exceed-it",
-      "featureTitle": "In the PledgeSection frontend component, display the remaining available HH budget (max HH budget minus total already pledged HH) and disable or prevent submission of the pledge form when the entered amount exceeds the remaining budget. Show a clear inline error or warning when the user attempts to exceed it.",
+      "featureId": "feature-fix-the-actor-not-available-error-that-occurs-when-a-user-attempts-to-create-a-project-ensure-the-backend-actor-is-fully-initialized-and-available-before-any-mutation-calls-createproject-createtask-etc-are-made-from-the-frontend-if-the-actor-is-not-yet-ready-show-a-loading-state-or-disabled-button-rather-than-an-error",
+      "featureTitle": "Fix the 'actor not available' error that occurs when a user attempts to create a project. Ensure the backend actor is fully initialized and available before any mutation calls (createProject, createTask, etc.) are made from the frontend. If the actor is not yet ready, show a loading state or disabled button rather than an error.",
       "files": [
-        "frontend/src/components/PledgeSection.tsx"
+        "frontend/src/components/CreateProjectDialog.tsx"
+      ],
+      "components": [
+        "authorization@1.0.1",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-restore-correct-data-loading-so-that-all-previously-persisted-projects-and-tasks-are-fetched-and-displayed-in-the-dashboard-on-login-the-frontend-must-not-ignore-existing-backend-state-all-projects-and-tasks-stored-in-the-canister-must-be-retrieved-and-rendered-correctly-after-authentication",
+      "featureTitle": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard on login. The frontend must not ignore existing backend state — all projects and tasks stored in the canister must be retrieved and rendered correctly after authentication.",
+      "files": [
+        "frontend/src/components/Dashboard.tsx"
       ],
       "components": [
         "authorization@1.0.1",
@@ -17,6 +36,25 @@
       ],
       "testIds": [
         "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-ensure-the-useactor-hook-and-all-dependent-react-query-hooks-usequeries-ts-wait-for-the-actor-to-be-fully-available-before-executing-queries-or-mutations-guard-all-actor-dependent-query-functions-so-they-are-only-called-when-the-actor-instance-is-non-null-preventing-race-conditions-on-initial-load",
+      "featureTitle": "Ensure the useActor hook and all dependent React Query hooks (useQueries.ts) wait for the actor to be fully available before executing queries or mutations. Guard all actor-dependent query functions so they are only called when the actor instance is non-null, preventing race conditions on initial load.",
+      "files": [
+        "frontend/src/components/MainApp.tsx"
+      ],
+      "components": [
+        "authorization@1.0.1",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
       ],
       "confidence": "high"
     }

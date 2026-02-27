@@ -1,31 +1,55 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-26T20:32:30.139Z",
+  "generatedAt": "2026-02-27T19:45:02.895Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 2,
-    "implemented": 1,
+    "total": 3,
+    "implemented": 3,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "In the backend, when a user submits a pledge for a project, validate that the total pledged HH (sum of all existing approved + pending pledges for that project, plus the new pledge amount) does not exceed the project's maximum HH budget. If the new pledge would cause the total to exceed the budget, reject it with a descriptive error message.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "summary": "Fix the 'actor not available' error that occurs when a user attempts to create a project. Ensure the backend actor is fully initialized and available before any mutation calls (createProject, createTask, etc.) are made from the frontend. If the actor is not yet ready, show a loading state or disabled button rather than an error.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/CreateProjectDialog.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/CreateProjectDialog.tsx"
+        ]
       },
       {
         "id": "REQ-2",
-        "summary": "In the PledgeSection frontend component, display the remaining available HH budget (max HH budget minus total already pledged HH) and disable or prevent submission of the pledge form when the entered amount exceeds the remaining budget. Show a clear inline error or warning when the user attempts to exceed it.",
+        "summary": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard on login. The frontend must not ignore existing backend state — all projects and tasks stored in the canister must be retrieved and rendered correctly after authentication.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/PledgeSection.tsx"
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/Dashboard.tsx",
+          "frontend/src/components/ProjectDetailsDialog.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/PledgeSection.tsx"
+          "frontend/src/components/Dashboard.tsx"
+        ]
+      },
+      {
+        "id": "REQ-3",
+        "summary": "Ensure the useActor hook and all dependent React Query hooks (useQueries.ts) wait for the actor to be fully available before executing queries or mutations. Guard all actor-dependent query functions so they are only called when the actor instance is non-null, preventing race conditions on initial load.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/MainApp.tsx",
+          "frontend/src/components/TaskCard.tsx",
+          "frontend/src/components/PledgeSection.tsx",
+          "frontend/src/components/PeerRatingSection.tsx",
+          "frontend/src/components/CompleteProjectButton.tsx",
+          "frontend/src/components/ProfileSetupModal.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/MainApp.tsx"
         ]
       }
     ]
@@ -36,9 +60,9 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/components/PledgeSection.tsx",
-    "frontend/src/components/TaskCard.tsx",
-    "frontend/src/components/TasksSection.tsx",
+    "frontend/src/components/CreateProjectDialog.tsx",
+    "frontend/src/components/Dashboard.tsx",
+    "frontend/src/components/MainApp.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

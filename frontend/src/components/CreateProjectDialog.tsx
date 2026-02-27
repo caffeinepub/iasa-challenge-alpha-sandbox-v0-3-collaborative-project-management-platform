@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useCreateProject } from '../hooks/useQueries';
+import { useActor } from '../hooks/useActor';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function CreateProjectDialog() {
@@ -17,10 +18,20 @@ export default function CreateProjectDialog() {
   const [resourceLink, setResourceLink] = useState('');
   const [otherTasksPoolHH, setOtherTasksPoolHH] = useState('');
 
+  const { actor, isFetching: actorFetching } = useActor();
   const createProject = useCreateProject();
+
+  const isActorReady = !!actor && !actorFetching;
+  const isSubmitting = createProject.isPending;
+  const isDisabled = !isActorReady || isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isActorReady) {
+      toast.error('Backend is still connecting. Please wait a moment and try again.');
+      return;
+    }
 
     if (!title.trim() || !description.trim() || !estimatedHH || !monetaryValue) {
       toast.error('Please fill in all required fields');
@@ -76,9 +87,18 @@ export default function CreateProjectDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Project
+        <Button disabled={!isActorReady}>
+          {actorFetching ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Connecting...
+            </>
+          ) : (
+            <>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Project
+            </>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
@@ -96,7 +116,7 @@ export default function CreateProjectDialog() {
               placeholder="Enter project title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={createProject.isPending}
+              disabled={isDisabled}
             />
           </div>
 
@@ -107,7 +127,7 @@ export default function CreateProjectDialog() {
               placeholder="Describe your project goals and requirements"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              disabled={createProject.isPending}
+              disabled={isDisabled}
               rows={4}
             />
           </div>
@@ -123,7 +143,7 @@ export default function CreateProjectDialog() {
                 placeholder="100"
                 value={estimatedHH}
                 onChange={(e) => setEstimatedHH(e.target.value)}
-                disabled={createProject.isPending}
+                disabled={isDisabled}
               />
             </div>
 
@@ -137,7 +157,7 @@ export default function CreateProjectDialog() {
                 placeholder="5000"
                 value={monetaryValue}
                 onChange={(e) => setMonetaryValue(e.target.value)}
-                disabled={createProject.isPending}
+                disabled={isDisabled}
               />
             </div>
           </div>
@@ -152,7 +172,7 @@ export default function CreateProjectDialog() {
               placeholder="10 (default: 0)"
               value={otherTasksPoolHH}
               onChange={(e) => setOtherTasksPoolHH(e.target.value)}
-              disabled={createProject.isPending}
+              disabled={isDisabled}
             />
             <p className="text-xs text-muted-foreground">
               HH reserved for the "Other Tasks" pool. The PM can reassign these hours to specific tasks later.
@@ -167,16 +187,23 @@ export default function CreateProjectDialog() {
               placeholder="https://example.com/resources"
               value={resourceLink}
               onChange={(e) => setResourceLink(e.target.value)}
-              disabled={createProject.isPending}
+              disabled={isDisabled}
             />
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={createProject.isPending}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createProject.isPending}>
-              {createProject.isPending ? 'Creating...' : 'Create Project'}
+            <Button type="submit" disabled={isDisabled}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Project'
+              )}
             </Button>
           </div>
         </form>

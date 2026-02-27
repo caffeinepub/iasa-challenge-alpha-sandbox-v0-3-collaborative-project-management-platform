@@ -1,22 +1,24 @@
-import { Project, Pledge } from '../backend';
+import { Project, Pledge, SquadRole } from '../backend';
 import { useGetPledges, useSignOffPledge, useGetUserProfile } from '../hooks/useQueries';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Clock, AlertCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PledgeSectionProps {
   project: Project;
+  userProfile?: { squadRole: SquadRole; friendlyUsername: string } | null;
 }
 
-export default function PledgeSection({ project }: PledgeSectionProps) {
+export default function PledgeSection({ project, userProfile = null }: PledgeSectionProps) {
   const { data: pledges = [] } = useGetPledges(project.id);
   const { identity } = useInternetIdentity();
   const signOffPledge = useSignOffPledge();
 
+  // Only the PM (project creator) can sign off (confirm HH) pledges
   const isCreator = identity?.getPrincipal().toString() === project.creator.toString();
 
   const pendingPledges = pledges.filter((p) => p.status === 'pending');
@@ -42,7 +44,7 @@ export default function PledgeSection({ project }: PledgeSectionProps) {
 
   const getTargetLabel = (pledge: Pledge) => {
     if (pledge.target.__kind__ === 'otherTasks') return 'Other Tasks Pool';
-    return `Task #${(pledge.target as any).task?.toString() ?? '?'}`;
+    return `Task #${(pledge.target as { __kind__: 'task'; task: bigint }).task?.toString() ?? '?'}`;
   };
 
   if (project.status === 'active') {
@@ -66,7 +68,12 @@ export default function PledgeSection({ project }: PledgeSectionProps) {
           </CardContent>
         </Card>
 
-        <PledgeList pledges={approvedPledges} title="Approved Pledges" currentUserPrincipal={identity?.getPrincipal().toString()} getTargetLabel={getTargetLabel} />
+        <PledgeList
+          pledges={approvedPledges}
+          title="Approved Pledges"
+          currentUserPrincipal={identity?.getPrincipal().toString()}
+          getTargetLabel={getTargetLabel}
+        />
       </div>
     );
   }
@@ -120,9 +127,15 @@ export default function PledgeSection({ project }: PledgeSectionProps) {
             >
               <div className="flex items-center gap-2">
                 {isBudgetFull ? (
-                  <AlertTriangle className={`h-4 w-4 text-red-500`} />
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
                 ) : (
-                  <Clock className={`h-4 w-4 ${remainingBudget < project.estimatedTotalHH * 0.1 ? 'text-yellow-500' : 'text-primary'}`} />
+                  <Clock
+                    className={`h-4 w-4 ${
+                      remainingBudget < project.estimatedTotalHH * 0.1
+                        ? 'text-yellow-500'
+                        : 'text-primary'
+                    }`}
+                  />
                 )}
                 <span
                   className={
@@ -161,7 +174,7 @@ export default function PledgeSection({ project }: PledgeSectionProps) {
         </Card>
       )}
 
-      {/* PM: Pending Pledges Sign-off */}
+      {/* PM: Pending Pledges Sign-off — only visible to project creator */}
       {isCreator && pendingPledges.length > 0 && (
         <Card className="border-yellow-500/30 bg-yellow-500/5">
           <CardHeader className="pb-3">
@@ -172,7 +185,7 @@ export default function PledgeSection({ project }: PledgeSectionProps) {
               </CardTitle>
             </div>
             <CardDescription>
-              Review and approve these pledges. Only approved pledges count toward project activation.
+              As Project Manager, review and confirm these pledges. Only approved pledges count toward project activation.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -189,6 +202,23 @@ export default function PledgeSection({ project }: PledgeSectionProps) {
               />
             ))}
           </CardContent>
+        </Card>
+      )}
+
+      {/* Non-PM: show info about pending pledges */}
+      {!isCreator && pendingPledges.length > 0 && (
+        <Card className="border-yellow-500/20 bg-yellow-500/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-yellow-500" />
+              <CardTitle className="text-sm text-yellow-700 dark:text-yellow-400">
+                {pendingPledges.length} pledge(s) awaiting PM confirmation
+              </CardTitle>
+            </div>
+            <CardDescription>
+              The Project Manager needs to confirm these pledges before they count toward activation.
+            </CardDescription>
+          </CardHeader>
         </Card>
       )}
 
@@ -246,10 +276,15 @@ function PendingPledgeRow({
 }: PendingPledgeRowProps) {
   const { data: userProfile } = useGetUserProfile(pledge.user);
 
-  // The backend doesn't return pledge IDs in the Pledge type.
-  // We need to find the pledge ID by matching. Since we can't get the actual ID,
-  // we use the index as a proxy. See backend-gaps for the proper fix.
-  const pledgeId = BigInt(pledgeIndex);
+  // Find the actual index in the full pledges array to use as pledge ID
+  const fullIndex = allPledges.findIndex(
+    (p) =>
+      p.user.toString() === pledge.user.toString() &&
+      p.amount === pledge.amount &&
+      p.status === pledge.status &&
+      p.timestamp === pledge.timestamp
+  );
+  const pledgeId = BigInt(fullIndex >= 0 ? fullIndex : pledgeIndex);
 
   return (
     <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-background p-3">
@@ -281,9 +316,10 @@ function PendingPledgeRow({
           size="sm"
           onClick={() => onSignOff(pledgeId)}
           disabled={isSigningOff}
-          className="h-7 text-xs"
+          className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
         >
-          {isSigningOff ? '...' : 'Approve'}
+          <ShieldCheck className="mr-1 h-3 w-3" />
+          {isSigningOff ? '...' : 'Confirm HH'}
         </Button>
       </div>
     </div>
@@ -298,10 +334,18 @@ interface PledgeListProps {
   variant?: 'default' | 'muted';
 }
 
-function PledgeList({ pledges, title, currentUserPrincipal, getTargetLabel, variant = 'default' }: PledgeListProps) {
+function PledgeList({
+  pledges,
+  title,
+  currentUserPrincipal,
+  getTargetLabel,
+  variant = 'default',
+}: PledgeListProps) {
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">{title}</h3>
+      <h3 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        {title}
+      </h3>
       <div className="space-y-2">
         {pledges.map((pledge, index) => (
           <PledgeRow
@@ -331,7 +375,11 @@ function PledgeRow({
   const { data: userProfile } = useGetUserProfile(pledge.user);
 
   return (
-    <div className={`flex items-center justify-between rounded-lg border p-3 ${variant === 'muted' ? 'opacity-60' : ''}`}>
+    <div
+      className={`flex items-center justify-between rounded-lg border p-3 ${
+        variant === 'muted' ? 'opacity-60' : ''
+      }`}
+    >
       <div className="flex items-center gap-3">
         <Avatar className="h-8 w-8">
           <AvatarFallback className="text-xs">

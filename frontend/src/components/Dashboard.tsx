@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useGetCallerUserProfile, useGetProjects } from '../hooks/useQueries';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Zap, Star, Award } from 'lucide-react';
 import ProjectsTab from './ProjectsTab';
 import CreateProjectDialog from './CreateProjectDialog';
 
 export default function Dashboard() {
   const { data: userProfile } = useGetCallerUserProfile();
-  const { data: projects = [] } = useGetProjects();
+  const { data: projects = [], isLoading: projectsLoading } = useGetProjects();
   const [activeTab, setActiveTab] = useState('all');
 
   const pledgingProjects = projects.filter((p) => p.status === 'pledging');
@@ -63,30 +64,50 @@ export default function Dashboard() {
         <CreateProjectDialog />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all">All ({projects.length})</TabsTrigger>
-          <TabsTrigger value="pledging">Pledging ({pledgingProjects.length})</TabsTrigger>
-          <TabsTrigger value="active">Active ({activeProjects.length})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({completedProjects.length})</TabsTrigger>
-        </TabsList>
+      {projectsLoading ? (
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-full mt-2" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-4 w-1/2 mb-2" />
+                  <Skeleton className="h-2 w-full mb-4" />
+                  <Skeleton className="h-8 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="all">All ({projects.length})</TabsTrigger>
+            <TabsTrigger value="pledging">Pledging ({pledgingProjects.length})</TabsTrigger>
+            <TabsTrigger value="active">Active ({activeProjects.length})</TabsTrigger>
+            <TabsTrigger value="completed">Completed ({completedProjects.length})</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="all" className="mt-6">
-          <ProjectsTab projects={projects} />
-        </TabsContent>
+          <TabsContent value="all" className="mt-6">
+            <ProjectsTab projects={projects} />
+          </TabsContent>
 
-        <TabsContent value="pledging" className="mt-6">
-          <ProjectsTab projects={pledgingProjects} />
-        </TabsContent>
+          <TabsContent value="pledging" className="mt-6">
+            <ProjectsTab projects={pledgingProjects} />
+          </TabsContent>
 
-        <TabsContent value="active" className="mt-6">
-          <ProjectsTab projects={activeProjects} />
-        </TabsContent>
+          <TabsContent value="active" className="mt-6">
+            <ProjectsTab projects={activeProjects} />
+          </TabsContent>
 
-        <TabsContent value="completed" className="mt-6">
-          <ProjectsTab projects={completedProjects} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="completed" className="mt-6">
+            <ProjectsTab projects={completedProjects} />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

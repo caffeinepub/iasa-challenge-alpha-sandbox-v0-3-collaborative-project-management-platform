@@ -2,38 +2,39 @@
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
   "summary": "New project",
-  "architectural_notes": [
-    "Pledge amounts must be validated against the maximum HH budget; pledges exceeding the budget cap should be rejected"
+  "architectural_notes": [],
+  "known_issues": [
+    "Version 9 draft ignores previously generated project/task data and shows 'actor not available' error when creating a project"
   ],
-  "known_issues": [],
-  "isFixRequest": false,
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-in-the-pledgesection-frontend-component-display-the-remaining-available-hh-budget-max-hh-budget-minus-total-already-pledged-hh-and-disable-or-prevent-submission-of-the-pledge-form-when-the-entered-amount-exceeds-the-remaining-budget-show-a-clear-inline-error-or-warning-when-the-user-attempts-to-exceed-it",
-      "title": "In the PledgeSection frontend component, display the remaining available HH budget (max HH budget minus total already pledged HH) and disable or prevent submission of the pledge form when the entered amount exceeds the remaining budget. Show a clear inline error or warning when the user attempts to exceed it.",
+      "id": "feature-fix-the-actor-not-available-error-that-occurs-when-a-user-attempts-to-create-a-project-ensure-the-backend-actor-is-fully-initialized-and-available-before-any-mutation-calls-createproject-createtask-etc-are-made-from-the-frontend-if-the-actor-is-not-yet-ready-show-a-loading-state-or-disabled-button-rather-than-an-error",
+      "title": "Fix the 'actor not available' error that occurs when a user attempts to create a project. Ensure the backend actor is fully initialized and available before any mutation calls (createProject, createTask, etc.) are made from the frontend. If the actor is not yet ready, show a loading state or disabled button rather than an error.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-restore-correct-data-loading-so-that-all-previously-persisted-projects-and-tasks-are-fetched-and-displayed-in-the-dashboard-on-login-the-frontend-must-not-ignore-existing-backend-state-all-projects-and-tasks-stored-in-the-canister-must-be-retrieved-and-rendered-correctly-after-authentication",
+      "title": "Restore correct data loading so that all previously persisted projects and tasks are fetched and displayed in the Dashboard on login. The frontend must not ignore existing backend state — all projects and tasks stored in the canister must be retrieved and rendered correctly after authentication.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
-    }
-  ],
-  "new_feature_requests": [
-    {
-      "id": "AR-1",
-      "summary": "Pledges can only be made up to the maximum HH budget limit",
-      "reqIds": [],
-      "status": "pending"
     },
     {
-      "id": "AR-2",
-      "summary": "In the backend, when a user submits a pledge for a project, validate that the total pledged HH (sum of all existing approved + pending pledges for that project, plus the new pledge amount) does not exceed the project's maximum HH budget. If the new pledge would cause the total to exceed the budget, reject it with a descriptive error message.",
+      "id": "feature-ensure-the-useactor-hook-and-all-dependent-react-query-hooks-usequeries-ts-wait-for-the-actor-to-be-fully-available-before-executing-queries-or-mutations-guard-all-actor-dependent-query-functions-so-they-are-only-called-when-the-actor-instance-is-non-null-preventing-race-conditions-on-initial-load",
+      "title": "Ensure the useActor hook and all dependent React Query hooks (useQueries.ts) wait for the actor to be fully available before executing queries or mutations. Guard all actor-dependent query functions so they are only called when the actor instance is non-null, preventing race conditions on initial load.",
       "reqIds": [
-        "REQ-1"
+        "REQ-3"
       ],
-      "status": "pending"
+      "version": 1
     }
   ],
-  "projectName": "Enforce maximum HH budget cap on pledges",
+  "new_feature_requests": [],
+  "projectName": "Fix actor availability error and restore previously generated project/task data",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

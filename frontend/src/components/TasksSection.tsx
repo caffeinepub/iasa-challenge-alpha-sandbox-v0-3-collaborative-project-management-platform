@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Project, Task } from '../backend';
+import { Project, Task, SquadRole } from '../backend';
 import { useGetTasks, useGetPledges, usePledgeToTask, useReassignFromOtherTasks } from '../hooks/useQueries';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { Button } from '@/components/ui/button';
@@ -16,30 +16,28 @@ import { toast } from 'sonner';
 
 interface TasksSectionProps {
   project: Project;
+  userProfile?: { squadRole: SquadRole; friendlyUsername: string } | null;
 }
 
-export default function TasksSection({ project }: TasksSectionProps) {
+export default function TasksSection({ project, userProfile = null }: TasksSectionProps) {
   const { data: tasks = [] } = useGetTasks(project.id);
   const { data: pledges = [] } = useGetPledges(project.id);
   const { identity } = useInternetIdentity();
 
-  const isCreator = identity?.getPrincipal().toString() === project.creator.toString();
+  const currentUserPrincipal = identity?.getPrincipal().toString();
+  const isCreator = currentUserPrincipal === project.creator.toString();
   const isParticipant =
     isCreator ||
-    project.participants.some((p) => p.toString() === identity?.getPrincipal().toString());
+    project.participants.some((p) => p.toString() === currentUserPrincipal);
+
+  // Any authenticated user can create tasks (not just creator)
+  const canCreateTask =
+    !!currentUserPrincipal &&
+    (project.status === 'pledging' || project.status === 'active');
 
   // Separate "Other Tasks" pool from regular tasks
   const otherTasksEntry = tasks.find((t) => t.title === 'Other Tasks');
   const regularTasks = tasks.filter((t) => t.title !== 'Other Tasks');
-
-  // Calculate pledged HH for Other Tasks pool (approved + pending)
-  const otherTasksPledges = pledges.filter((p) => p.target.__kind__ === 'otherTasks');
-  const otherTasksApprovedHH = otherTasksPledges
-    .filter((p) => p.status === 'approved')
-    .reduce((sum, p) => sum + p.amount, 0);
-  const otherTasksPendingHH = otherTasksPledges
-    .filter((p) => p.status === 'pending')
-    .reduce((sum, p) => sum + p.amount, 0);
 
   // Calculate total active pledges (pending + approved) across the whole project
   const totalActivePledgedHH = pledges
@@ -49,20 +47,30 @@ export default function TasksSection({ project }: TasksSectionProps) {
   // Remaining budget available for new pledges
   const remainingBudget = Math.max(0, project.estimatedTotalHH - totalActivePledgedHH);
 
+  // Calculate pledged HH for Other Tasks pool
+  const otherTasksPledges = pledges.filter((p) => p.target.__kind__ === 'otherTasks');
+  const otherTasksApprovedHH = otherTasksPledges
+    .filter((p) => p.status === 'approved')
+    .reduce((sum, p) => sum + p.amount, 0);
+  const otherTasksPendingHH = otherTasksPledges
+    .filter((p) => p.status === 'pending')
+    .reduce((sum, p) => sum + p.amount, 0);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Tasks</h3>
         <div className="flex gap-2">
           {isCreator && project.status === 'active' && <CompleteProjectButton project={project} />}
-          {isCreator && (project.status === 'pledging' || project.status === 'active') && (
+          {/* Create Task visible to all authenticated users */}
+          {canCreateTask && (
             <CreateTaskDialog project={project} />
           )}
         </div>
       </div>
 
       {/* Remaining Budget Banner */}
-      {(project.status === 'pledging' || project.status === 'active') && isParticipant && (
+      {(project.status === 'pledging' || project.status === 'active') && (
         <div
           className={`flex items-center justify-between rounded-lg border px-4 py-2 text-sm ${
             remainingBudget <= 0
@@ -100,7 +108,7 @@ export default function TasksSection({ project }: TasksSectionProps) {
           otherTasksApprovedHH={otherTasksApprovedHH}
           otherTasksPendingHH={otherTasksPendingHH}
           isCreator={isCreator}
-          isParticipant={isParticipant}
+          isParticipant={!!currentUserPrincipal}
           remainingBudget={remainingBudget}
         />
       )}
@@ -109,7 +117,7 @@ export default function TasksSection({ project }: TasksSectionProps) {
       {regularTasks.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="text-muted-foreground">No specific tasks yet</p>
-          {isCreator && (project.status === 'pledging' || project.status === 'active') && (
+          {canCreateTask && (
             <p className="mt-2 text-sm text-muted-foreground">Create tasks to allocate project work</p>
           )}
         </div>
@@ -121,7 +129,9 @@ export default function TasksSection({ project }: TasksSectionProps) {
               task={task}
               project={project}
               pledges={pledges}
+              isCreator={isCreator}
               remainingBudget={remainingBudget}
+              userProfile={userProfile}
             />
           ))}
         </div>
@@ -255,7 +265,7 @@ function OtherTasksPoolCard({
           )}
         </div>
 
-        {/* Pledge to Other Tasks */}
+        {/* Pledge to Other Tasks — visible to all authenticated users */}
         {isParticipant && canPledge && (
           <div className="space-y-1">
             {isBudgetFull ? (
@@ -320,7 +330,7 @@ function OtherTasksPoolCard({
                     </SelectTrigger>
                     <SelectContent>
                       {reassignablePledges.map((pledge, idx) => (
-                        <SelectItem key={idx} value={getPledgeId(pledge).toString()}>
+                        <SelectItem key={idx} value={idx.toString()}>
                           {pledge.amount.toFixed(1)} HH — {pledge.user.toString().slice(0, 8)}...
                         </SelectItem>
                       ))}
@@ -385,17 +395,4 @@ function OtherTasksPoolCard({
       </CardContent>
     </Card>
   );
-}
-
-// Helper to get pledge ID from the pledges array index
-// Since the backend returns pledges without their map key, we use a workaround
-// by storing the index as a proxy. The actual pledgeId must come from the backend.
-// We use the pledge's timestamp + user as a unique identifier for display,
-// but for reassignment we need the actual pledge ID from the backend.
-// For now, we use the array index as a fallback identifier.
-function getPledgeId(pledge: any): bigint {
-  // The backend doesn't return pledge IDs in the Pledge type.
-  // We use the index stored in the pledge object if available.
-  // This is a limitation - see backend-gaps.
-  return pledge._id ?? BigInt(0);
 }
