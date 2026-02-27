@@ -20,7 +20,6 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func assignCallerUserRole(user : Principal, role : AccessControl.UserRole) : async () {
-    // Admin-only check happens inside AccessControl.assignRole
     AccessControl.assignRole(accessControlState, caller, user, role);
   };
 
@@ -32,6 +31,7 @@ actor IASAChallenge {
     #Apprentice;
     #Journeyman;
     #Mentor;
+    #Masters;
   };
 
   public type UserProfile = {
@@ -90,10 +90,24 @@ actor IASAChallenge {
     auditStartTime : ?Time.Time;
   };
 
+  public type PledgeStatus = {
+    #pending;
+    #approved;
+    #reassigned;
+  };
+
+  public type PledgeTarget = {
+    #task : Nat;
+    #otherTasks;
+  };
+
   public type Pledge = {
     user : Principal;
     projectId : Nat;
-    pledgedHH : Float;
+    amount : Float;
+    target : PledgeTarget;
+    status : PledgeStatus;
+    timestamp : Time.Time;
   };
 
   public type Vote = {
@@ -120,9 +134,7 @@ actor IASAChallenge {
   };
 
   transient let principalMap = OrderedMap.Make<Principal>(Principal.compare);
-  transient let natMap = OrderedMap.Make<Nat>(func(a : Nat, b : Nat) : { #less; #equal; #greater } {
-    if (a < b) #less else if (a == b) #equal else #greater
-  });
+  transient let natMap = OrderedMap.Make<Nat>(func(a : Nat, b : Nat) : { #less; #equal; #greater } { if (a < b) #less else if (a == b) #equal else #greater });
 
   var userProfiles = principalMap.empty<UserProfile>();
   var projects = natMap.empty<Project>();
@@ -138,24 +150,6 @@ actor IASAChallenge {
   var nextVoteId = 0;
   var nextChallengeId = 0;
   var nextRatingId = 0;
-
-  // ── Authorization helpers ────────────────────────────────────────────────
-
-  /// Require the caller to have at least the #user role (blocks anonymous/guest callers).
-  private func requireUser(caller : Principal) {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Debug.trap("Unauthorized: Only registered users can perform this action");
-    };
-  };
-
-  /// Require the caller to have the #admin role.
-  private func requireAdmin(caller : Principal) {
-    if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
-      Debug.trap("Unauthorized: Only admins can perform this action");
-    };
-  };
-
-  // ── Internal helpers ─────────────────────────────────────────────────────
 
   private func isProjectParticipant(projectId : Nat, user : Principal) : Bool {
     switch (natMap.get(projects, projectId)) {
@@ -183,9 +177,19 @@ actor IASAChallenge {
       projectTasks,
       0.0,
       func(acc, task) {
-        if (task.projectId == projectId) { acc + task.hhBudget } else { acc };
+        if (task.projectId == projectId) {
+          acc + task.hhBudget;
+        } else {
+          acc;
+        };
       },
     );
+  };
+
+  private func getTotalAssignedHH(projectId : Nat) : Float {
+    let projectPledges = Iter.toArray(natMap.vals(pledges));
+    let approvedPledges = Array.filter<Pledge>(projectPledges, func(p) { p.projectId == projectId and p.status == #approved });
+    Array.foldLeft<Pledge, Float>(approvedPledges, 0.0, func(acc, pledge) { acc + pledge.amount });
   };
 
   private func hasAlreadyRated(rater : Principal, ratee : Principal, projectId : Nat) : Bool {
@@ -200,19 +204,27 @@ actor IASAChallenge {
 
   private func hasActiveChallenges(taskId : Nat) : Bool {
     let allChallenges = Iter.toArray(natMap.vals(challenges));
-    Array.find<Challenge>(allChallenges, func(c) { c.taskId == taskId }) != null;
+    Array.find<Challenge>(
+      allChallenges,
+      func(c) { c.taskId == taskId },
+    ) != null;
   };
 
-  // ── User profile functions ───────────────────────────────────────────────
+  // Profile functions
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
-      Debug.trap("Unauthorized: Only users can view profiles");
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can access profiles");
     };
     principalMap.get(userProfiles, caller);
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    // Must be an authenticated user first
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only authenticated users can view profiles");
+    };
+    // Can only view own profile unless admin
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
       Debug.trap("Unauthorized: Can only view your own profile");
     };
@@ -220,17 +232,16 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Debug.trap("Unauthorized: Only users can save profiles");
     };
     userProfiles := principalMap.put(userProfiles, caller, profile);
   };
 
-  // ── Application functions ────────────────────────────────────────────────
-
-  /// Register the calling principal as a participant. Requires #user role.
   public shared ({ caller }) func registerUser(username : Text, role : SquadRole) : async () {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can register a profile");
+    };
     switch (principalMap.get(userProfiles, caller)) {
       case (?_) { Debug.trap("User already registered") };
       case null {
@@ -251,21 +262,23 @@ actor IASAChallenge {
     };
   };
 
-  /// Create a new project. Requires #user role.
-  public shared ({ caller }) func createProject(
-    title : Text,
-    description : Text,
-    estimatedTotalHH : Float,
-    finalMonetaryValue : Float,
-    sharedResourceLink : ?Text,
-  ) : async Nat {
-    requireUser(caller);
+  // Project functions
+
+  public shared ({ caller }) func createProject(title : Text, description : Text, estimatedTotalHH : Float, finalMonetaryValue : Float, sharedResourceLink : ?Text, otherTasksPoolHH : Float) : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can create projects");
+    };
 
     if (estimatedTotalHH <= 0.0) {
       Debug.trap("Invalid: Estimated total HH must be positive");
     };
+
     if (finalMonetaryValue < 0.0) {
       Debug.trap("Invalid: Final monetary value cannot be negative");
+    };
+
+    if (otherTasksPoolHH < 0.0 or otherTasksPoolHH > estimatedTotalHH) {
+      Debug.trap("Invalid: Other Tasks pool HH must be non-negative and not exceed total HH");
     };
 
     let projectId = nextProjectId;
@@ -286,95 +299,54 @@ actor IASAChallenge {
     };
 
     projects := natMap.put(projects, projectId, project);
+
+    let otherTask : Task = {
+      id = nextTaskId;
+      projectId;
+      title = "Other Tasks";
+      description = "General pool for unallocated HH";
+      hhBudget = otherTasksPoolHH;
+      dependencies = [];
+      status = #proposed;
+      assignee = null;
+      completionTime = null;
+      auditStartTime = null;
+    };
+
+    nextTaskId += 1;
+    tasks := natMap.put(tasks, otherTask.id, otherTask);
+
     projectId;
   };
 
-  /// Pledge hours to a project. Requires #user role.
-  public shared ({ caller }) func pledgeHH(projectId : Nat, pledgedHH : Float) : async () {
-    requireUser(caller);
-
-    if (pledgedHH <= 0.0) {
-      Debug.trap("Invalid: Pledged HH must be positive");
+  public shared ({ caller }) func createTask(projectId : Nat, title : Text, description : Text, hhBudget : Float, dependencies : [Nat]) : async Nat {
+    // Must be an authenticated user
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can create tasks");
     };
 
     switch (natMap.get(projects, projectId)) {
       case null { Debug.trap("Project not found") };
       case (?project) {
-        if (project.status != #pledging) {
-          Debug.trap("Project is not in pledging status");
+        // PM only: must be project creator or admin
+        if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
+          Debug.trap("Unauthorized: Only project creator (PM) can create tasks");
         };
 
-        let pledge : Pledge = {
-          user = caller;
-          projectId;
-          pledgedHH;
+        if (hhBudget <= 0.0) {
+          Debug.trap("Invalid: Task HH budget must be positive");
         };
 
-        pledges := natMap.put(pledges, nextPledgeId, pledge);
-        nextPledgeId += 1;
-
-        let isParticipant = Array.find<Principal>(project.participants, func(p) { p == caller }) != null;
-        let updatedParticipants = if (not isParticipant and caller != project.creator) {
-          Array.append<Principal>(project.participants, [caller]);
-        } else {
-          project.participants;
-        };
-
-        let updatedProject = {
-          project with
-          totalPledgedHH = project.totalPledgedHH + pledgedHH;
-          participants = updatedParticipants;
-        };
-
-        projects := natMap.put(projects, projectId, updatedProject);
-
-        if (updatedProject.totalPledgedHH >= updatedProject.estimatedTotalHH) {
-          let activeProject = { updatedProject with status = #active };
-          projects := natMap.put(projects, projectId, activeProject);
-        };
-
-        switch (principalMap.get(userProfiles, caller)) {
-          case null {};
-          case (?profile) {
-            let updatedProfile = {
-              profile with
-              totalPledgedHH = profile.totalPledgedHH + pledgedHH;
-            };
-            userProfiles := principalMap.put(userProfiles, caller, updatedProfile);
-          };
-        };
-      };
-    };
-  };
-
-  /// Create a task within a project. Requires #user role and project participation.
-  public shared ({ caller }) func createTask(
-    projectId : Nat,
-    title : Text,
-    description : Text,
-    hhBudget : Float,
-    dependencies : [Nat],
-  ) : async Nat {
-    requireUser(caller);
-
-    if (hhBudget <= 0.0) {
-      Debug.trap("Invalid: Task HH budget must be positive");
-    };
-
-    switch (natMap.get(projects, projectId)) {
-      case null { Debug.trap("Project not found") };
-      case (?project) {
-        if (not isProjectParticipant(projectId, caller)) {
-          Debug.trap("Unauthorized: Only project participants can create tasks");
-        };
-
-        if (project.status != #active) {
-          Debug.trap("Project is not active");
+        let otherTasksHH = switch (getOtherTaskForProject(projectId)) {
+          case null { 0.0 };
+          case (?otherTask) { otherTask.hhBudget };
         };
 
         let currentTotalBudget = getTotalTaskBudget(projectId);
-        if (currentTotalBudget + hhBudget > project.totalPledgedHH) {
-          Debug.trap("Invalid: Total task budget would exceed total pledged HH");
+        let allowedBudget = project.estimatedTotalHH - otherTasksHH;
+
+        if (currentTotalBudget + hhBudget > allowedBudget) {
+          Debug.trap("Invalid: Total task budget would exceed allowed HH (excluding Other Tasks pool)");
         };
 
         for (depId in dependencies.vals()) {
@@ -410,9 +382,240 @@ actor IASAChallenge {
     };
   };
 
-  /// Accept (self-assign) a task. Requires #user role and project participation.
+  func getOtherTaskForProject(projectId : Nat) : ?Task {
+    let projectTasks = Iter.toArray(natMap.vals(tasks));
+    Array.find<Task>(projectTasks, func(t) { t.projectId == projectId and t.title == "Other Tasks" });
+  };
+
+  // Pledge functions
+
+  public shared ({ caller }) func pledgeToTask(projectId : Nat, target : PledgeTarget, amount : Float) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can pledge to tasks");
+    };
+
+    if (amount <= 0.0) {
+      Debug.trap("Invalid: Pledge amount must be positive");
+    };
+
+    switch (natMap.get(projects, projectId)) {
+      case null { Debug.trap("Project not found") };
+      case (?project) {
+
+        // Calculate total existing pledges (approved + pending) for the project
+        let projectPledges = Iter.toArray(natMap.vals(pledges));
+        let relevantPledges = Array.filter<Pledge>(
+          projectPledges,
+          func(p) { p.projectId == projectId and (p.status == #approved or p.status == #pending) },
+        );
+
+        let totalExistingPledged : Float = Array.foldLeft<Pledge, Float>(
+          relevantPledges,
+          0.0,
+          func(acc, pledge) { acc + pledge.amount },
+        );
+
+        // Calculate total after new pledge
+        let totalAfterNewPledge = totalExistingPledged + amount;
+
+        // Compare against max HH budget
+        if (totalAfterNewPledge > project.estimatedTotalHH) {
+          let remainingBudget = project.estimatedTotalHH - totalExistingPledged;
+          Debug.trap(
+            "Pledge exceeds remaining budget by " #
+            Float.toText(totalAfterNewPledge - project.estimatedTotalHH) #
+            " HH. Remaining budget: " #
+            Float.toText(remainingBudget) #
+            " HH."
+          );
+        };
+
+        switch (target) {
+          case (#task taskId) {
+            switch (natMap.get(tasks, taskId)) {
+              case null { Debug.trap("Target task not found") };
+              case (?task) {
+                if (task.projectId != projectId) {
+                  Debug.trap("Target task does not belong to project");
+                };
+              };
+            };
+          };
+          case (#otherTasks) {
+            switch (getOtherTaskForProject(projectId)) {
+              case null { Debug.trap("Other Tasks pool not found for project") };
+              case (?_) { };
+            };
+          };
+        };
+
+        let pledge : Pledge = {
+          user = caller;
+          projectId;
+          amount;
+          target;
+          status = #pending;
+          timestamp = Time.now();
+        };
+
+        pledges := natMap.put(pledges, nextPledgeId, pledge);
+        nextPledgeId += 1;
+
+        let isParticipant = Array.find<Principal>(project.participants, func(p) { p == caller }) != null;
+        let updatedParticipants = if (not isParticipant and caller != project.creator) {
+          Array.append<Principal>(project.participants, [caller]);
+        } else {
+          project.participants;
+        };
+
+        let updatedProject = {
+          project with
+          participants = updatedParticipants;
+        };
+
+        projects := natMap.put(projects, projectId, updatedProject);
+
+        switch (principalMap.get(userProfiles, caller)) {
+          case null { };
+          case (?profile) {
+            let updatedProfile = {
+              profile with
+              totalPledgedHH = profile.totalPledgedHH + amount;
+            };
+            userProfiles := principalMap.put(userProfiles, caller, updatedProfile);
+          };
+        };
+      };
+    };
+  };
+
+  func updateProjectStatus(projectId : Nat) : () {
+    switch (natMap.get(projects, projectId)) {
+      case null { };
+      case (?project) {
+        if (project.status != #pledging) { return };
+
+        let totalAssigned = getTotalAssignedHH(projectId);
+        let activationThreshold = project.estimatedTotalHH * 0.8;
+
+        let hasPendingPledges = do {
+          let allPledges = Iter.toArray(natMap.vals(pledges));
+          Array.find<Pledge>(
+            allPledges,
+            func(p) {
+              p.projectId == projectId and p.status == #pending
+            },
+          ) != null;
+        };
+
+        if (totalAssigned > activationThreshold and not hasPendingPledges) {
+          let activatedProject = { project with status = #active };
+          projects := natMap.put(projects, projectId, activatedProject);
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func signOffPledge(pledgeId : Nat) : async () {
+    // Must be an authenticated user
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can sign off pledges");
+    };
+
+    switch (natMap.get(pledges, pledgeId)) {
+      case null { Debug.trap("Pledge not found") };
+      case (?pledge) {
+        switch (natMap.get(projects, pledge.projectId)) {
+          case null { Debug.trap("Project not found") };
+          case (?project) {
+            // PM only: must be project creator or admin
+            if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
+              Debug.trap("Unauthorized: Only project creator (PM) can sign off pledges");
+            };
+
+            if (pledge.status != #pending) {
+              Debug.trap("Pledge is not pending approval");
+            };
+
+            let approvedPledge = {
+              pledge with
+              status = #approved;
+            };
+
+            pledges := natMap.put(pledges, pledgeId, approvedPledge);
+
+            // Check project activation after every sign-off
+            updateProjectStatus(pledge.projectId);
+          };
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func reassignFromOtherTasks(pledgeId : Nat, newTaskId : Nat) : async () {
+    // Must be an authenticated user
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can reassign from Other Tasks pool");
+    };
+
+    switch (natMap.get(pledges, pledgeId)) {
+      case null { Debug.trap("Other Tasks pledge not found") };
+      case (?pledge) {
+        switch (pledge.target) {
+          case (#otherTasks) {
+            switch (natMap.get(projects, pledge.projectId)) {
+              case null { Debug.trap("Project not found") };
+              case (?project) {
+                // PM only: must be project creator or admin
+                if (caller != project.creator and not AccessControl.isAdmin(accessControlState, caller)) {
+                  Debug.trap("Unauthorized: Only project creator (PM) can reassign from Other Tasks pool");
+                };
+
+                switch (natMap.get(tasks, newTaskId)) {
+                  case null { Debug.trap("New target task not found") };
+                  case (?newTask) {
+                    if (newTask.projectId != project.id) {
+                      Debug.trap("New target task does not belong to same project");
+                    };
+
+                    let reassignedPledge = {
+                      pledge with
+                      target = #task newTaskId;
+                      status = #reassigned;
+                    };
+
+                    pledges := natMap.put(pledges, pledgeId, reassignedPledge);
+
+                    let reassignmentPledge : Pledge = {
+                      user = pledge.user;
+                      projectId = pledge.projectId;
+                      amount = pledge.amount;
+                      target = #task newTaskId;
+                      status = #approved;
+                      timestamp = Time.now();
+                    };
+
+                    pledges := natMap.put(pledges, nextPledgeId, reassignmentPledge);
+                    nextPledgeId += 1;
+
+                    updateProjectStatus(pledge.projectId);
+                  };
+                };
+              };
+            };
+          };
+          case (#task _) { Debug.trap("Not an Other Tasks pledge") };
+        };
+      };
+    };
+  };
+
+  // Task lifecycle functions
+
   public shared ({ caller }) func acceptTask(taskId : Nat) : async () {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can accept tasks");
+    };
 
     switch (natMap.get(tasks, taskId)) {
       case null { Debug.trap("Task not found") };
@@ -431,7 +634,7 @@ actor IASAChallenge {
               Debug.trap("Task is already assigned to another user");
             };
           };
-          case null {};
+          case null { };
         };
 
         for (depId in task.dependencies.vals()) {
@@ -456,9 +659,10 @@ actor IASAChallenge {
     };
   };
 
-  /// Mark a task as complete (moves to audit). Requires #user role; caller must be assignee.
   public shared ({ caller }) func completeTask(taskId : Nat) : async () {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can complete tasks");
+    };
 
     switch (natMap.get(tasks, taskId)) {
       case null { Debug.trap("Task not found") };
@@ -488,9 +692,10 @@ actor IASAChallenge {
     };
   };
 
-  /// Approve a task after the audit window. Requires #user role; caller must be project creator or admin.
   public shared ({ caller }) func approveTask(taskId : Nat) : async () {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can approve tasks");
+    };
 
     switch (natMap.get(tasks, taskId)) {
       case null { Debug.trap("Task not found") };
@@ -534,10 +739,10 @@ actor IASAChallenge {
         tasks := natMap.put(tasks, taskId, updatedTask);
 
         switch (task.assignee) {
-          case null {};
+          case null { };
           case (?assignee) {
             switch (principalMap.get(userProfiles, assignee)) {
-              case null {};
+              case null { };
               case (?profile) {
                 let updatedProfile = {
                   profile with
@@ -552,9 +757,10 @@ actor IASAChallenge {
     };
   };
 
-  /// Challenge a task during its audit window. Requires #user role and project participation.
   public shared ({ caller }) func challengeTask(taskId : Nat, stakeHH : Float) : async () {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can challenge tasks");
+    };
 
     if (stakeHH < 1.0) {
       Debug.trap("Invalid: Challenge requires at least 1 HH stake");
@@ -605,12 +811,10 @@ actor IASAChallenge {
     };
   };
 
-  /// Cast a vote. Requires #user role and relevant project participation.
-  public shared ({ caller }) func vote(
-    targetId : Nat,
-    voteType : { #taskProposal; #challenge; #finalPrize },
-  ) : async () {
-    requireUser(caller);
+  public shared ({ caller }) func vote(targetId : Nat, voteType : { #taskProposal; #challenge; #finalPrize }) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can vote");
+    };
 
     let voterProfile = switch (principalMap.get(userProfiles, caller)) {
       case null { Debug.trap("Voter profile not found") };
@@ -678,9 +882,10 @@ actor IASAChallenge {
     nextVoteId += 1;
   };
 
-  /// Submit a peer rating. Requires #user role and project participation.
   public shared ({ caller }) func ratePeer(ratee : Principal, projectId : Nat, rating : Float) : async () {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can rate peers");
+    };
 
     if (caller == ratee) {
       Debug.trap("Cannot rate yourself");
@@ -747,6 +952,7 @@ actor IASAChallenge {
                     case (#Mentor) { 3.0 };
                     case (#Journeyman) { 2.0 };
                     case (#Apprentice) { 1.0 };
+                    case (#Masters) { 1.0 };
                   };
                 };
               };
@@ -764,6 +970,7 @@ actor IASAChallenge {
                     case (#Mentor) { 3.0 };
                     case (#Journeyman) { 2.0 };
                     case (#Apprentice) { 1.0 };
+                    case (#Masters) { 1.0 };
                   };
                 };
               };
@@ -778,7 +985,7 @@ actor IASAChallenge {
           };
 
           switch (principalMap.get(userProfiles, ratee)) {
-            case null {};
+            case null { };
             case (?profile) {
               let updatedProfile = {
                 profile with
@@ -793,9 +1000,10 @@ actor IASAChallenge {
     };
   };
 
-  /// Complete a project. Requires #user role; caller must be project creator or admin.
   public shared ({ caller }) func completeProject(projectId : Nat) : async () {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can complete projects");
+    };
 
     switch (natMap.get(projects, projectId)) {
       case null { Debug.trap("Project not found") };
@@ -820,21 +1028,28 @@ actor IASAChallenge {
     };
   };
 
-  // ── Query functions ──────────────────────────────────────────────────────
+  // Query functions
 
   public query ({ caller }) func getProjects() : async [Project] {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can view projects");
+    };
     Iter.toArray(natMap.vals(projects));
   };
 
   public query ({ caller }) func getTasks(projectId : Nat) : async [Task] {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can view tasks");
+    };
+
     let allTasks = Iter.toArray(natMap.vals(tasks));
     Array.filter<Task>(allTasks, func(task) { task.projectId == projectId });
   };
 
   public query ({ caller }) func getPledges(projectId : Nat) : async [Pledge] {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can view pledges");
+    };
 
     let allPledges = Iter.toArray(natMap.vals(pledges));
     let projectPledges = Array.filter<Pledge>(allPledges, func(pledge) { pledge.projectId == projectId });
@@ -847,13 +1062,18 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getVotes(targetId : Nat) : async [Vote] {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can view votes");
+    };
+
     let allVotes = Iter.toArray(natMap.vals(votes));
     Array.filter<Vote>(allVotes, func(v) { v.targetId == targetId });
   };
 
   public query ({ caller }) func getPeerRatings(projectId : Nat) : async [PeerRating] {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can view peer ratings");
+    };
 
     let allRatings = Iter.toArray(natMap.vals(peerRatings));
     let projectRatings = Array.filter<PeerRating>(allRatings, func(rating) { rating.projectId == projectId });
@@ -866,7 +1086,10 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getChallenges(taskId : Nat) : async [Challenge] {
-    requireUser(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can view challenges");
+    };
+
     let allChallenges = Iter.toArray(natMap.vals(challenges));
     Array.filter<Challenge>(allChallenges, func(challenge) { challenge.taskId == taskId });
   };

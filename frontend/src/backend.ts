@@ -89,17 +89,20 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface Challenge {
-    stakeHH: number;
-    taskId: bigint;
-    timestamp: Time;
-    challenger: Principal;
-}
 export type Time = bigint;
-export interface Pledge {
-    user: Principal;
-    pledgedHH: number;
+export type PledgeTarget = {
+    __kind__: "task";
+    task: bigint;
+} | {
+    __kind__: "otherTasks";
+    otherTasks: null;
+};
+export interface PeerRating {
     projectId: bigint;
+    timestamp: Time;
+    rating: number;
+    ratee: Principal;
+    rater: Principal;
 }
 export interface Task {
     id: bigint;
@@ -113,12 +116,19 @@ export interface Task {
     dependencies: Array<bigint>;
     auditStartTime?: Time;
 }
-export interface PeerRating {
+export interface Challenge {
+    stakeHH: number;
+    taskId: bigint;
+    timestamp: Time;
+    challenger: Principal;
+}
+export interface Pledge {
+    status: PledgeStatus;
+    user: Principal;
+    target: PledgeTarget;
     projectId: bigint;
     timestamp: Time;
-    rating: number;
-    ratee: Principal;
-    rater: Principal;
+    amount: number;
 }
 export interface Vote {
     weight: number;
@@ -152,6 +162,11 @@ export interface Project {
     finalMonetaryValue: number;
     estimatedTotalHH: number;
 }
+export enum PledgeStatus {
+    pending = "pending",
+    approved = "approved",
+    reassigned = "reassigned"
+}
 export enum ProjectStatus {
     active = "active",
     completed = "completed",
@@ -161,7 +176,8 @@ export enum ProjectStatus {
 export enum SquadRole {
     Journeyman = "Journeyman",
     Mentor = "Mentor",
-    Apprentice = "Apprentice"
+    Apprentice = "Apprentice",
+    Masters = "Masters"
 }
 export enum TaskStatus {
     active = "active",
@@ -182,34 +198,13 @@ export enum Variant_finalPrize_challenge_taskProposal {
     taskProposal = "taskProposal"
 }
 export interface backendInterface {
-    /**
-     * / Accept (self-assign) a task. Requires #user role and project participation.
-     */
     acceptTask(taskId: bigint): Promise<void>;
-    /**
-     * / Approve a task after the audit window. Requires #user role; caller must be project creator or admin.
-     */
     approveTask(taskId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    /**
-     * / Challenge a task during its audit window. Requires #user role and project participation.
-     */
     challengeTask(taskId: bigint, stakeHH: number): Promise<void>;
-    /**
-     * / Complete a project. Requires #user role; caller must be project creator or admin.
-     */
     completeProject(projectId: bigint): Promise<void>;
-    /**
-     * / Mark a task as complete (moves to audit). Requires #user role; caller must be assignee.
-     */
     completeTask(taskId: bigint): Promise<void>;
-    /**
-     * / Create a new project. Requires #user role.
-     */
-    createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null): Promise<bigint>;
-    /**
-     * / Create a task within a project. Requires #user role and project participation.
-     */
+    createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null, otherTasksPoolHH: number): Promise<bigint>;
     createTask(projectId: bigint, title: string, description: string, hhBudget: number, dependencies: Array<bigint>): Promise<bigint>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
@@ -222,25 +217,15 @@ export interface backendInterface {
     getVotes(targetId: bigint): Promise<Array<Vote>>;
     initializeAccessControl(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
-    /**
-     * / Pledge hours to a project. Requires #user role.
-     */
-    pledgeHH(projectId: bigint, pledgedHH: number): Promise<void>;
-    /**
-     * / Submit a peer rating. Requires #user role and project participation.
-     */
+    pledgeToTask(projectId: bigint, target: PledgeTarget, amount: number): Promise<void>;
     ratePeer(ratee: Principal, projectId: bigint, rating: number): Promise<void>;
-    /**
-     * / Register the calling principal as a participant. Requires #user role.
-     */
+    reassignFromOtherTasks(pledgeId: bigint, newTaskId: bigint): Promise<void>;
     registerUser(username: string, role: SquadRole): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    /**
-     * / Cast a vote. Requires #user role and relevant project participation.
-     */
+    signOffPledge(pledgeId: bigint): Promise<void>;
     vote(targetId: bigint, voteType: Variant_finalPrize_challenge_taskProposal): Promise<void>;
 }
-import type { Project as _Project, ProjectStatus as _ProjectStatus, SquadRole as _SquadRole, Task as _Task, TaskStatus as _TaskStatus, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, Vote as _Vote } from "./declarations/backend.did.d.ts";
+import type { Pledge as _Pledge, PledgeStatus as _PledgeStatus, PledgeTarget as _PledgeTarget, Project as _Project, ProjectStatus as _ProjectStatus, SquadRole as _SquadRole, Task as _Task, TaskStatus as _TaskStatus, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, Vote as _Vote } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async acceptTask(arg0: bigint): Promise<void> {
@@ -327,17 +312,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createProject(arg0: string, arg1: string, arg2: number, arg3: number, arg4: string | null): Promise<bigint> {
+    async createProject(arg0: string, arg1: string, arg2: number, arg3: number, arg4: string | null, arg5: number): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.createProject(arg0, arg1, arg2, arg3, to_candid_opt_n3(this._uploadFile, this._downloadFile, arg4));
+                const result = await this.actor.createProject(arg0, arg1, arg2, arg3, to_candid_opt_n3(this._uploadFile, this._downloadFile, arg4), arg5);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createProject(arg0, arg1, arg2, arg3, to_candid_opt_n3(this._uploadFile, this._downloadFile, arg4));
+            const result = await this.actor.createProject(arg0, arg1, arg2, arg3, to_candid_opt_n3(this._uploadFile, this._downloadFile, arg4), arg5);
             return result;
         }
     }
@@ -415,42 +400,42 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getPledges(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getPledges(arg0);
-            return result;
-        }
-    }
-    async getProjects(): Promise<Array<Project>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getProjects();
                 return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getProjects();
+            const result = await this.actor.getPledges(arg0);
             return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getTasks(arg0: bigint): Promise<Array<Task>> {
+    async getProjects(): Promise<Array<Project>> {
         if (this.processError) {
             try {
-                const result = await this.actor.getTasks(arg0);
+                const result = await this.actor.getProjects();
                 return from_candid_vec_n18(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getTasks(arg0);
+            const result = await this.actor.getProjects();
             return from_candid_vec_n18(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getTasks(arg0: bigint): Promise<Array<Task>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getTasks(arg0);
+                return from_candid_vec_n25(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getTasks(arg0);
+            return from_candid_vec_n25(this._uploadFile, this._downloadFile, result);
         }
     }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
@@ -471,14 +456,14 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getVotes(arg0);
-                return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getVotes(arg0);
-            return from_candid_vec_n24(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n31(this._uploadFile, this._downloadFile, result);
         }
     }
     async initializeAccessControl(): Promise<void> {
@@ -509,17 +494,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async pledgeHH(arg0: bigint, arg1: number): Promise<void> {
+    async pledgeToTask(arg0: bigint, arg1: PledgeTarget, arg2: number): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.pledgeHH(arg0, arg1);
+                const result = await this.actor.pledgeToTask(arg0, to_candid_PledgeTarget_n35(this._uploadFile, this._downloadFile, arg1), arg2);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.pledgeHH(arg0, arg1);
+            const result = await this.actor.pledgeToTask(arg0, to_candid_PledgeTarget_n35(this._uploadFile, this._downloadFile, arg1), arg2);
             return result;
         }
     }
@@ -537,63 +522,100 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async registerUser(arg0: string, arg1: SquadRole): Promise<void> {
+    async reassignFromOtherTasks(arg0: bigint, arg1: bigint): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.registerUser(arg0, to_candid_SquadRole_n28(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.reassignFromOtherTasks(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.registerUser(arg0, to_candid_SquadRole_n28(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.reassignFromOtherTasks(arg0, arg1);
+            return result;
+        }
+    }
+    async registerUser(arg0: string, arg1: SquadRole): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.registerUser(arg0, to_candid_SquadRole_n37(this._uploadFile, this._downloadFile, arg1));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.registerUser(arg0, to_candid_SquadRole_n37(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
     async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n30(this._uploadFile, this._downloadFile, arg0));
+                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n39(this._uploadFile, this._downloadFile, arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n30(this._uploadFile, this._downloadFile, arg0));
+            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n39(this._uploadFile, this._downloadFile, arg0));
+            return result;
+        }
+    }
+    async signOffPledge(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.signOffPledge(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.signOffPledge(arg0);
             return result;
         }
     }
     async vote(arg0: bigint, arg1: Variant_finalPrize_challenge_taskProposal): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.vote(arg0, to_candid_variant_n32(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.vote(arg0, to_candid_variant_n41(this._uploadFile, this._downloadFile, arg1));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.vote(arg0, to_candid_variant_n32(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.vote(arg0, to_candid_variant_n41(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
 }
-function from_candid_ProjectStatus_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ProjectStatus): ProjectStatus {
+function from_candid_PledgeStatus_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PledgeStatus): PledgeStatus {
     return from_candid_variant_n15(_uploadFile, _downloadFile, value);
 }
-function from_candid_Project_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Project): Project {
+function from_candid_PledgeTarget_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PledgeTarget): PledgeTarget {
+    return from_candid_variant_n17(_uploadFile, _downloadFile, value);
+}
+function from_candid_Pledge_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Pledge): Pledge {
     return from_candid_record_n13(_uploadFile, _downloadFile, value);
+}
+function from_candid_ProjectStatus_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ProjectStatus): ProjectStatus {
+    return from_candid_variant_n22(_uploadFile, _downloadFile, value);
+}
+function from_candid_Project_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Project): Project {
+    return from_candid_record_n20(_uploadFile, _downloadFile, value);
 }
 function from_candid_SquadRole_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _SquadRole): SquadRole {
     return from_candid_variant_n8(_uploadFile, _downloadFile, value);
 }
-function from_candid_TaskStatus_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _TaskStatus): TaskStatus {
-    return from_candid_variant_n22(_uploadFile, _downloadFile, value);
+function from_candid_TaskStatus_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _TaskStatus): TaskStatus {
+    return from_candid_variant_n29(_uploadFile, _downloadFile, value);
 }
-function from_candid_Task_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Task): Task {
-    return from_candid_record_n20(_uploadFile, _downloadFile, value);
+function from_candid_Task_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Task): Task {
+    return from_candid_record_n27(_uploadFile, _downloadFile, value);
 }
 function from_candid_UserProfile_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
     return from_candid_record_n6(_uploadFile, _downloadFile, value);
@@ -601,22 +623,46 @@ function from_candid_UserProfile_n5(_uploadFile: (file: ExternalBlob) => Promise
 function from_candid_UserRole_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
     return from_candid_variant_n10(_uploadFile, _downloadFile, value);
 }
-function from_candid_Vote_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Vote): Vote {
-    return from_candid_record_n26(_uploadFile, _downloadFile, value);
+function from_candid_Vote_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Vote): Vote {
+    return from_candid_record_n33(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Time]): Time | null {
+function from_candid_opt_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Time]): Time | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+function from_candid_opt_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [Principal]): Principal | null {
+function from_candid_opt_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [Principal]): Principal | null {
     return value.length === 0 ? null : value[0];
 }
 function from_candid_opt_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
     return value.length === 0 ? null : from_candid_UserProfile_n5(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    status: _PledgeStatus;
+    user: Principal;
+    target: _PledgeTarget;
+    projectId: bigint;
+    timestamp: _Time;
+    amount: number;
+}): {
+    status: PledgeStatus;
+    user: Principal;
+    target: PledgeTarget;
+    projectId: bigint;
+    timestamp: Time;
+    amount: number;
+} {
+    return {
+        status: from_candid_PledgeStatus_n14(_uploadFile, _downloadFile, value.status),
+        user: value.user,
+        target: from_candid_PledgeTarget_n16(_uploadFile, _downloadFile, value.target),
+        projectId: value.projectId,
+        timestamp: value.timestamp,
+        amount: value.amount
+    };
+}
+function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     status: _ProjectStatus;
     title: string;
@@ -643,19 +689,19 @@ function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         id: value.id,
-        status: from_candid_ProjectStatus_n14(_uploadFile, _downloadFile, value.status),
+        status: from_candid_ProjectStatus_n21(_uploadFile, _downloadFile, value.status),
         title: value.title,
         creator: value.creator,
         participants: value.participants,
-        completionTime: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.completionTime)),
+        completionTime: record_opt_to_undefined(from_candid_opt_n23(_uploadFile, _downloadFile, value.completionTime)),
         totalPledgedHH: value.totalPledgedHH,
         description: value.description,
-        sharedResourceLink: record_opt_to_undefined(from_candid_opt_n17(_uploadFile, _downloadFile, value.sharedResourceLink)),
+        sharedResourceLink: record_opt_to_undefined(from_candid_opt_n24(_uploadFile, _downloadFile, value.sharedResourceLink)),
         finalMonetaryValue: value.finalMonetaryValue,
         estimatedTotalHH: value.estimatedTotalHH
     };
 }
-function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     status: _TaskStatus;
     assignee: [] | [Principal];
@@ -680,18 +726,18 @@ function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         id: value.id,
-        status: from_candid_TaskStatus_n21(_uploadFile, _downloadFile, value.status),
-        assignee: record_opt_to_undefined(from_candid_opt_n23(_uploadFile, _downloadFile, value.assignee)),
+        status: from_candid_TaskStatus_n28(_uploadFile, _downloadFile, value.status),
+        assignee: record_opt_to_undefined(from_candid_opt_n30(_uploadFile, _downloadFile, value.assignee)),
         title: value.title,
         hhBudget: value.hhBudget,
-        completionTime: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.completionTime)),
+        completionTime: record_opt_to_undefined(from_candid_opt_n23(_uploadFile, _downloadFile, value.completionTime)),
         description: value.description,
         projectId: value.projectId,
         dependencies: value.dependencies,
-        auditStartTime: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.auditStartTime))
+        auditStartTime: record_opt_to_undefined(from_candid_opt_n23(_uploadFile, _downloadFile, value.auditStartTime))
     };
 }
-function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     weight: number;
     voteType: {
         finalPrize: null;
@@ -712,7 +758,7 @@ function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         weight: value.weight,
-        voteType: from_candid_variant_n27(_uploadFile, _downloadFile, value.voteType),
+        voteType: from_candid_variant_n34(_uploadFile, _downloadFile, value.voteType),
         voter: value.voter,
         timestamp: value.timestamp,
         targetId: value.targetId
@@ -764,6 +810,34 @@ function from_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Ui
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
 }
 function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    pending: null;
+} | {
+    approved: null;
+} | {
+    reassigned: null;
+}): PledgeStatus {
+    return "pending" in value ? PledgeStatus.pending : "approved" in value ? PledgeStatus.approved : "reassigned" in value ? PledgeStatus.reassigned : value;
+}
+function from_candid_variant_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    task: bigint;
+} | {
+    otherTasks: null;
+}): {
+    __kind__: "task";
+    task: bigint;
+} | {
+    __kind__: "otherTasks";
+    otherTasks: null;
+} {
+    return "task" in value ? {
+        __kind__: "task",
+        task: value.task
+    } : "otherTasks" in value ? {
+        __kind__: "otherTasks",
+        otherTasks: value.otherTasks
+    } : value;
+}
+function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     active: null;
 } | {
     completed: null;
@@ -774,7 +848,7 @@ function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): ProjectStatus {
     return "active" in value ? ProjectStatus.active : "completed" in value ? ProjectStatus.completed : "pledging" in value ? ProjectStatus.pledging : "archived" in value ? ProjectStatus.archived : value;
 }
-function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     active: null;
 } | {
     completed: null;
@@ -789,7 +863,7 @@ function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): TaskStatus {
     return "active" in value ? TaskStatus.active : "completed" in value ? TaskStatus.completed : "rejected" in value ? TaskStatus.rejected : "proposed" in value ? TaskStatus.proposed : "inAudit" in value ? TaskStatus.inAudit : "inProgress" in value ? TaskStatus.inProgress : value;
 }
-function from_candid_variant_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     finalPrize: null;
 } | {
     challenge: null;
@@ -804,23 +878,31 @@ function from_candid_variant_n8(_uploadFile: (file: ExternalBlob) => Promise<Uin
     Mentor: null;
 } | {
     Apprentice: null;
+} | {
+    Masters: null;
 }): SquadRole {
-    return "Journeyman" in value ? SquadRole.Journeyman : "Mentor" in value ? SquadRole.Mentor : "Apprentice" in value ? SquadRole.Apprentice : value;
+    return "Journeyman" in value ? SquadRole.Journeyman : "Mentor" in value ? SquadRole.Mentor : "Apprentice" in value ? SquadRole.Apprentice : "Masters" in value ? SquadRole.Masters : value;
 }
-function from_candid_vec_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Project>): Array<Project> {
-    return value.map((x)=>from_candid_Project_n12(_uploadFile, _downloadFile, x));
+function from_candid_vec_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Pledge>): Array<Pledge> {
+    return value.map((x)=>from_candid_Pledge_n12(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Task>): Array<Task> {
-    return value.map((x)=>from_candid_Task_n19(_uploadFile, _downloadFile, x));
+function from_candid_vec_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Project>): Array<Project> {
+    return value.map((x)=>from_candid_Project_n19(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Vote>): Array<Vote> {
-    return value.map((x)=>from_candid_Vote_n25(_uploadFile, _downloadFile, x));
+function from_candid_vec_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Task>): Array<Task> {
+    return value.map((x)=>from_candid_Task_n26(_uploadFile, _downloadFile, x));
 }
-function to_candid_SquadRole_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: SquadRole): _SquadRole {
-    return to_candid_variant_n29(_uploadFile, _downloadFile, value);
+function from_candid_vec_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Vote>): Array<Vote> {
+    return value.map((x)=>from_candid_Vote_n32(_uploadFile, _downloadFile, x));
 }
-function to_candid_UserProfile_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
-    return to_candid_record_n31(_uploadFile, _downloadFile, value);
+function to_candid_PledgeTarget_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PledgeTarget): _PledgeTarget {
+    return to_candid_variant_n36(_uploadFile, _downloadFile, value);
+}
+function to_candid_SquadRole_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: SquadRole): _SquadRole {
+    return to_candid_variant_n38(_uploadFile, _downloadFile, value);
+}
+function to_candid_UserProfile_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
+    return to_candid_record_n40(_uploadFile, _downloadFile, value);
 }
 function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n2(_uploadFile, _downloadFile, value);
@@ -828,7 +910,7 @@ function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint
 function to_candid_opt_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
     return value === null ? candid_none() : candid_some(value);
 }
-function to_candid_record_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     totalPledgedHH: number;
     votingPower: number;
     friendlyUsername: string;
@@ -856,7 +938,7 @@ function to_candid_record_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         votingPower: value.votingPower,
         friendlyUsername: value.friendlyUsername,
         efficiencyBadgesCount: value.efficiencyBadgesCount,
-        squadRole: to_candid_SquadRole_n28(_uploadFile, _downloadFile, value.squadRole),
+        squadRole: to_candid_SquadRole_n37(_uploadFile, _downloadFile, value.squadRole),
         constructivenessRating: value.constructivenessRating,
         totalEnablerPoints: value.totalEnablerPoints,
         totalEarnedHH: value.totalEarnedHH,
@@ -879,12 +961,31 @@ function to_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         guest: null
     } : value;
 }
-function to_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: SquadRole): {
+function to_candid_variant_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    __kind__: "task";
+    task: bigint;
+} | {
+    __kind__: "otherTasks";
+    otherTasks: null;
+}): {
+    task: bigint;
+} | {
+    otherTasks: null;
+} {
+    return value.__kind__ === "task" ? {
+        task: value.task
+    } : value.__kind__ === "otherTasks" ? {
+        otherTasks: value.otherTasks
+    } : value;
+}
+function to_candid_variant_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: SquadRole): {
     Journeyman: null;
 } | {
     Mentor: null;
 } | {
     Apprentice: null;
+} | {
+    Masters: null;
 } {
     return value == SquadRole.Journeyman ? {
         Journeyman: null
@@ -892,9 +993,11 @@ function to_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint
         Mentor: null
     } : value == SquadRole.Apprentice ? {
         Apprentice: null
+    } : value == SquadRole.Masters ? {
+        Masters: null
     } : value;
 }
-function to_candid_variant_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Variant_finalPrize_challenge_taskProposal): {
+function to_candid_variant_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Variant_finalPrize_challenge_taskProposal): {
     finalPrize: null;
 } | {
     challenge: null;

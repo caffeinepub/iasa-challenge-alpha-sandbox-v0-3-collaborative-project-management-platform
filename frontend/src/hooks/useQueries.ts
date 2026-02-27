@@ -1,30 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
-import { UserProfile, Project, Task, Pledge, PeerRating, SquadRole, UserRole } from '../backend';
+import { UserProfile, Project, Task, Pledge, PeerRating, SquadRole, PledgeTarget } from '../backend';
 import { Principal } from '@icp-sdk/core/principal';
-import { useInternetIdentity } from './useInternetIdentity';
-
-// User Role / Participant Check
-export function useGetCallerUserRole() {
-  const { actor, isFetching: actorFetching } = useActor();
-  const { identity } = useInternetIdentity();
-
-  const query = useQuery<UserRole>({
-    queryKey: ['callerUserRole'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.getCallerUserRole();
-    },
-    enabled: !!actor && !actorFetching && !!identity,
-    retry: false,
-  });
-
-  return {
-    ...query,
-    isLoading: actorFetching || query.isLoading,
-    isFetched: !!actor && query.isFetched,
-  };
-}
 
 // User Profile Queries
 export function useGetCallerUserProfile() {
@@ -116,6 +93,7 @@ export function useCreateProject() {
       estimatedTotalHH: number;
       finalMonetaryValue: number;
       sharedResourceLink: string | null;
+      otherTasksPoolHH: number;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.createProject(
@@ -123,28 +101,12 @@ export function useCreateProject() {
         params.description,
         params.estimatedTotalHH,
         params.finalMonetaryValue,
-        params.sharedResourceLink
+        params.sharedResourceLink,
+        params.otherTasksPoolHH
       );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-  });
-}
-
-export function usePledgeHH() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: { projectId: bigint; pledgedHH: number }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.pledgeHH(params.projectId, params.pledgedHH);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['pledges'] });
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
     },
   });
 }
@@ -278,6 +240,57 @@ export function useGetPledges(projectId: bigint) {
       return actor.getPledges(projectId);
     },
     enabled: !!actor && !isFetching,
+  });
+}
+
+export function usePledgeToTask() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { projectId: bigint; target: PledgeTarget; amount: number }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.pledgeToTask(params.projectId, params.target, params.amount);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pledges', variables.projectId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+    },
+  });
+}
+
+export function useSignOffPledge() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (pledgeId: bigint) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.signOffPledge(pledgeId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pledges'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useReassignFromOtherTasks() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { pledgeId: bigint; newTaskId: bigint }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.reassignFromOtherTasks(params.pledgeId, params.newTaskId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pledges'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
   });
 }
 

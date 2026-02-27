@@ -22,8 +22,15 @@ export default function CreateTaskDialog({ project }: CreateTaskDialogProps) {
   const createTask = useCreateTask();
   const { data: tasks = [] } = useGetTasks(project.id);
 
-  const totalBudgetUsed = tasks.reduce((sum, task) => sum + task.hhBudget, 0);
-  const remainingBudget = project.totalPledgedHH - totalBudgetUsed;
+  // Separate the "Other Tasks" pool from regular tasks
+  const otherTasksEntry = tasks.find((t) => t.title === 'Other Tasks');
+  const otherTasksPoolHH = otherTasksEntry ? otherTasksEntry.hhBudget : 0;
+  const regularTasks = tasks.filter((t) => t.title !== 'Other Tasks');
+
+  // Remaining budget = total - other tasks pool - sum of regular task budgets
+  const regularTasksBudgetUsed = regularTasks.reduce((sum, task) => sum + task.hhBudget, 0);
+  const allowedBudget = project.estimatedTotalHH - otherTasksPoolHH;
+  const remainingBudget = allowedBudget - regularTasksBudgetUsed;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +83,7 @@ export default function CreateTaskDialog({ project }: CreateTaskDialogProps) {
           <DialogTitle>Create New Task</DialogTitle>
           <DialogDescription>
             Create a task for this project. Available budget: {remainingBudget.toFixed(1)} HH
+            {otherTasksPoolHH > 0 && ` (${otherTasksPoolHH.toFixed(1)} HH reserved for Other Tasks pool)`}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,11 +102,11 @@ export default function CreateTaskDialog({ project }: CreateTaskDialogProps) {
             <Label htmlFor="taskDescription">Description *</Label>
             <Textarea
               id="taskDescription"
-              placeholder="Describe the task requirements"
+              placeholder="Describe what needs to be done"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={createTask.isPending}
-              rows={4}
+              rows={3}
             />
           </div>
 
@@ -110,21 +118,18 @@ export default function CreateTaskDialog({ project }: CreateTaskDialogProps) {
               step="0.1"
               min="0.1"
               max={remainingBudget}
-              placeholder="10"
+              placeholder={`Max: ${remainingBudget.toFixed(1)} HH`}
               value={hhBudget}
               onChange={(e) => setHhBudget(e.target.value)}
               disabled={createTask.isPending}
             />
-            <p className="text-xs text-muted-foreground">
-              Maximum: {remainingBudget.toFixed(1)} HH
-            </p>
           </div>
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={createTask.isPending}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createTask.isPending}>
+            <Button type="submit" disabled={createTask.isPending || remainingBudget <= 0}>
               {createTask.isPending ? 'Creating...' : 'Create Task'}
             </Button>
           </div>

@@ -1,92 +1,26 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-26T00:06:32.623Z",
-  "summary": "The diff implements a role-based access control system via an AccessControl module in the backend and an UnauthorizedScreen component in the frontend. REQ-8 is largely satisfied. REQ-7 has partial coverage but several acceptance criteria are not clearly met or are missing.",
-  "missing_requirements": [
-    {
-      "id": "REQ-7",
-      "requirement": "A stable data structure (e.g., `allowedPrincipals`) is declared in the actor and survives upgrades.",
-      "reason": "The diff imports an AccessControl module and calls AccessControl.initState(), but the actual stable variable declaration inside the access-control module is not shown. The authorization/access-control module is not included in the diff. There is no evidence of a stable var for the allowlist in the visible code.",
-      "evidence": [
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-7",
-      "requirement": "An admin-only addParticipant(p: Principal) and removeParticipant(p: Principal) function exist so authorized principals can be managed at runtime.",
-      "reason": "The diff shows assignCallerUserRole which is a generic role assignment function, but no explicit addParticipant or removeParticipant functions are visible. These are distinct from generic role assignment and are required by the AC.",
-      "evidence": [
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-7",
-      "requirement": "The actor has an initial deployer/admin principal hardcoded or set during preupgrade/postupgrade so the allowlist is never empty on first deploy.",
-      "reason": "The diff shows an initializeAccessControl() function that must be called explicitly after deploy, rather than automatically setting the deployer as admin during deploy or in preupgrade/postupgrade. This means the allowlist could be empty until initializeAccessControl is manually called.",
-      "evidence": [
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-7",
-      "requirement": "Every state-mutating public function checks membership in the allowlist and returns an error (not a trap) for unauthorized callers.",
-      "reason": "The visible requireUser helper uses Debug.trap(...) for unauthorized callers, which is explicitly prohibited by the build constraints. The build request requires a Result or variant error, never an uncaught trap.",
-      "evidence": [
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-7",
-      "requirement": "A public query isParticipant(p: Principal): Bool is exposed so the frontend can check eligibility before showing the registration flow.",
-      "reason": "The diff does not show an isParticipant(p: Principal): Bool query function. Instead, getCallerUserRole() is used on the frontend to infer participant status. The required named query function is absent from the visible backend code.",
-      "evidence": [
-        "backend/main.mo",
-        "frontend/src/hooks/useQueries.ts"
-      ]
-    },
-    {
-      "id": "REQ-8",
-      "requirement": "After login, isParticipant is called with the authenticated principal.",
-      "reason": "The frontend calls getCallerUserRole() instead of isParticipant(principal). While functionally equivalent for gating, the AC specifically requires calling isParticipant with the authenticated principal.",
-      "evidence": [
-        "frontend/src/components/MainApp.tsx",
-        "frontend/src/hooks/useQueries.ts"
-      ]
-    }
-  ],
+  "generatedAt": "2026-02-26T20:32:30.137Z",
+  "summary": "The diff implements both REQ-1 (backend validation) and REQ-2 (frontend PledgeSection + TaskCard/TasksSection enforcement). Backend main.mo includes pledge budget cap validation. Frontend PledgeSection.tsx computes remainingBudget and shows isBudgetFull state. TaskCard.tsx and TasksSection.tsx also propagate remainingBudget and show inline errors and disabled states. All major acceptance criteria appear addressed, though the backend truncation prevents full confirmation of the exact error message wording.",
+  "missing_requirements": [],
   "hallucinated_features": [
     {
-      "description": "A role-based access control system with distinct UserRole levels (guest, user, admin) implemented via a separate AccessControl module, replacing a simple allowlist with a full role hierarchy.",
-      "reason": "The build request specifies a simple allowlist of authorized principals with admin management, not a multi-tier role system. The implementation adds a full UserRole type, getCallerUserRole, assignCallerUserRole, isCallerAdmin, and an AccessControl module, none of which were requested.",
+      "description": "Budget cap enforcement in TaskCard and TasksSection pledge forms (task-level pledge inputs also receive remainingBudget and enforce the cap with inline errors and disabled states)",
+      "reason": "REQ-2 specifically targets the PledgeSection frontend component. The diff also applies the same budget cap UI logic to TaskCard.tsx and TasksSection.tsx, which was not requested and contradicts the non-goal of not modifying task-level budget enforcement.",
       "evidence": [
-        "backend/main.mo",
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/components/MainApp.tsx"
-      ]
-    },
-    {
-      "description": "An initializeAccessControl() public shared function that must be explicitly called post-deploy to set up the admin.",
-      "reason": "The build request requires automatic admin initialization hardcoded or via pre/postupgrade, not a manually-invoked public function.",
-      "evidence": [
-        "backend/main.mo"
-      ]
-    },
-    {
-      "description": "Display of the user's principal ID in the UnauthorizedScreen and a link to grupo.iasa.cl for contact.",
-      "reason": "The build request only requires a clear message mentioning contacting the IASA administrator. Displaying the principal ID and a clickable link to grupo.iasa.cl are additional features not specified.",
-      "evidence": [
-        "frontend/src/components/UnauthorizedScreen.tsx"
+        "frontend/src/components/TaskCard.tsx",
+        "frontend/src/components/TasksSection.tsx"
       ]
     }
   ],
-  "confidence": 0.72,
+  "confidence": 0.78,
   "changed_files": [
     "backend/main.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/MainApp.tsx",
-    "frontend/src/components/UnauthorizedScreen.tsx",
-    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/components/PledgeSection.tsx",
+    "frontend/src/components/TaskCard.tsx",
+    "frontend/src/components/TasksSection.tsx",
     "project_state.json"
   ]
 }

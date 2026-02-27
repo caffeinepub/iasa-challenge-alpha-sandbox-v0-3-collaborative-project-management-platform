@@ -1,7 +1,7 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-26T00:06:32.626Z",
+  "generatedAt": "2026-02-26T20:32:30.139Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
@@ -11,25 +11,21 @@
     "implemented": 1,
     "items": [
       {
-        "id": "REQ-7",
-        "summary": "Define a stable allowlist of authorized participant principals in the backend actor. Provide an initial seed mechanism (e.g., a stable variable `authorizedPrincipals: [Principal]` or a `TrieSet`/`HashMap` of trusted principals) so that only recognized ICP identities associated with grupo.iasa.cl can call state-mutating functions such as `registerUser`, `createProject`, `pledgeHours`, `createTask`, `completeTask`, and `submitPeerRating`. Callers not in the allowlist must receive a `#Unauthorized` or descriptive error variant rather than a trap.",
+        "id": "REQ-1",
+        "summary": "In the backend, when a user submits a pledge for a project, validate that the total pledged HH (sum of all existing approved + pending pledges for that project, plus the new pledge amount) does not exceed the project's maximum HH budget. If the new pledge would cause the total to exceed the budget, reject it with a descriptive error message.",
         "status": "unknown",
         "plannedFiles": [],
         "matchedFiles": []
       },
       {
-        "id": "REQ-8",
-        "summary": "Update `MainApp.tsx` to call the `isParticipant` query after a user authenticates via Internet Identity. If the authenticated principal is not in the allowlist, display a clear, user-friendly message (e.g., 'Your identity is not yet authorized for this platform. Please contact the IASA administrator.') instead of rendering the `ProfileSetupModal` or `Dashboard`. Do not block the login flow itself — only gate the post-login content.",
+        "id": "REQ-2",
+        "summary": "In the PledgeSection frontend component, display the remaining available HH budget (max HH budget minus total already pledged HH) and disable or prevent submission of the pledge form when the entered amount exceeds the remaining budget. Show a clear inline error or warning when the user attempts to exceed it.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/MainApp.tsx",
-          "frontend/src/components/UnauthorizedScreen.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/components/PledgeSection.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/MainApp.tsx",
-          "frontend/src/components/UnauthorizedScreen.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/components/PledgeSection.tsx"
         ]
       }
     ]
@@ -40,12 +36,9 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/backend.d.ts",
-    "frontend/src/backend.ts",
-    "frontend/src/components/MainApp.tsx",
-    "frontend/src/components/UnauthorizedScreen.tsx",
-    "frontend/src/declarations/backend.did.d.ts",
-    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/components/PledgeSection.tsx",
+    "frontend/src/components/TaskCard.tsx",
+    "frontend/src/components/TasksSection.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

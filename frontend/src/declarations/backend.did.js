@@ -17,6 +17,7 @@ export const SquadRole = IDL.Variant({
   'Journeyman' : IDL.Null,
   'Mentor' : IDL.Null,
   'Apprentice' : IDL.Null,
+  'Masters' : IDL.Null,
 });
 export const UserProfile = IDL.Record({
   'totalPledgedHH' : IDL.Float64,
@@ -44,10 +45,22 @@ export const PeerRating = IDL.Record({
   'ratee' : IDL.Principal,
   'rater' : IDL.Principal,
 });
+export const PledgeStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'reassigned' : IDL.Null,
+});
+export const PledgeTarget = IDL.Variant({
+  'task' : IDL.Nat,
+  'otherTasks' : IDL.Null,
+});
 export const Pledge = IDL.Record({
+  'status' : PledgeStatus,
   'user' : IDL.Principal,
-  'pledgedHH' : IDL.Float64,
+  'target' : PledgeTarget,
   'projectId' : IDL.Nat,
+  'timestamp' : Time,
+  'amount' : IDL.Float64,
 });
 export const ProjectStatus = IDL.Variant({
   'active' : IDL.Null,
@@ -108,7 +121,14 @@ export const idlService = IDL.Service({
   'completeProject' : IDL.Func([IDL.Nat], [], []),
   'completeTask' : IDL.Func([IDL.Nat], [], []),
   'createProject' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Opt(IDL.Text)],
+      [
+        IDL.Text,
+        IDL.Text,
+        IDL.Float64,
+        IDL.Float64,
+        IDL.Opt(IDL.Text),
+        IDL.Float64,
+      ],
       [IDL.Nat],
       [],
     ),
@@ -132,10 +152,12 @@ export const idlService = IDL.Service({
   'getVotes' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
   'initializeAccessControl' : IDL.Func([], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'pledgeHH' : IDL.Func([IDL.Nat, IDL.Float64], [], []),
+  'pledgeToTask' : IDL.Func([IDL.Nat, PledgeTarget, IDL.Float64], [], []),
   'ratePeer' : IDL.Func([IDL.Principal, IDL.Nat, IDL.Float64], [], []),
+  'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
   'registerUser' : IDL.Func([IDL.Text, SquadRole], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'signOffPledge' : IDL.Func([IDL.Nat], [], []),
   'vote' : IDL.Func(
       [
         IDL.Nat,
@@ -162,6 +184,7 @@ export const idlFactory = ({ IDL }) => {
     'Journeyman' : IDL.Null,
     'Mentor' : IDL.Null,
     'Apprentice' : IDL.Null,
+    'Masters' : IDL.Null,
   });
   const UserProfile = IDL.Record({
     'totalPledgedHH' : IDL.Float64,
@@ -189,10 +212,22 @@ export const idlFactory = ({ IDL }) => {
     'ratee' : IDL.Principal,
     'rater' : IDL.Principal,
   });
+  const PledgeStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'reassigned' : IDL.Null,
+  });
+  const PledgeTarget = IDL.Variant({
+    'task' : IDL.Nat,
+    'otherTasks' : IDL.Null,
+  });
   const Pledge = IDL.Record({
+    'status' : PledgeStatus,
     'user' : IDL.Principal,
-    'pledgedHH' : IDL.Float64,
+    'target' : PledgeTarget,
     'projectId' : IDL.Nat,
+    'timestamp' : Time,
+    'amount' : IDL.Float64,
   });
   const ProjectStatus = IDL.Variant({
     'active' : IDL.Null,
@@ -253,7 +288,14 @@ export const idlFactory = ({ IDL }) => {
     'completeProject' : IDL.Func([IDL.Nat], [], []),
     'completeTask' : IDL.Func([IDL.Nat], [], []),
     'createProject' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Float64, IDL.Float64, IDL.Opt(IDL.Text)],
+        [
+          IDL.Text,
+          IDL.Text,
+          IDL.Float64,
+          IDL.Float64,
+          IDL.Opt(IDL.Text),
+          IDL.Float64,
+        ],
         [IDL.Nat],
         [],
       ),
@@ -277,10 +319,12 @@ export const idlFactory = ({ IDL }) => {
     'getVotes' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
     'initializeAccessControl' : IDL.Func([], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'pledgeHH' : IDL.Func([IDL.Nat, IDL.Float64], [], []),
+    'pledgeToTask' : IDL.Func([IDL.Nat, PledgeTarget, IDL.Float64], [], []),
     'ratePeer' : IDL.Func([IDL.Principal, IDL.Nat, IDL.Float64], [], []),
+    'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
     'registerUser' : IDL.Func([IDL.Text, SquadRole], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'signOffPledge' : IDL.Func([IDL.Nat], [], []),
     'vote' : IDL.Func(
         [
           IDL.Nat,

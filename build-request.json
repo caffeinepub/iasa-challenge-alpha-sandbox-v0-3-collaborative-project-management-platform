@@ -1,62 +1,55 @@
 {
   "kind": "build_request",
-  "title": "Define and enforce participant identity / access control",
-  "projectName": "IASA Challenge Sandbox",
-  "priority": "high",
+  "title": "Enforce maximum HH budget cap on pledges",
+  "priority": "normal",
   "requirements": [
     {
-      "id": "REQ-7",
-      "text": "Define a stable allowlist of authorized participant principals in the backend actor. Provide an initial seed mechanism (e.g., a stable variable `authorizedPrincipals: [Principal]` or a `TrieSet`/`HashMap` of trusted principals) so that only recognized ICP identities associated with grupo.iasa.cl can call state-mutating functions such as `registerUser`, `createProject`, `pledgeHours`, `createTask`, `completeTask`, and `submitPeerRating`. Callers not in the allowlist must receive a `#Unauthorized` or descriptive error variant rather than a trap.",
+      "id": "REQ-1",
+      "text": "In the backend, when a user submits a pledge for a project, validate that the total pledged HH (sum of all existing approved + pending pledges for that project, plus the new pledge amount) does not exceed the project's maximum HH budget. If the new pledge would cause the total to exceed the budget, reject it with a descriptive error message.",
       "target": "backend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "actor no valid? have you well defined who is participating? eg. simple every grupo.iasa.cl ID"
+          "it is important that pledges can be made only up to the maximum HH budget"
         ]
       },
       "acceptanceCriteria": [
-        "A stable data structure (e.g., `allowedPrincipals`) is declared in the actor and survives upgrades.",
-        "An admin-only `addParticipant(p: Principal)` and `removeParticipant(p: Principal)` function exist so authorized principals can be managed at runtime.",
-        "The actor has an initial deployer/admin principal hardcoded or set during `preupgrade`/`postupgrade` so the allowlist is never empty on first deploy.",
-        "Every state-mutating public function checks membership in the allowlist and returns an error (not a trap) for unauthorized callers.",
-        "A public query `isParticipant(p: Principal): Bool` is exposed so the frontend can check eligibility before showing the registration flow.",
-        "Read-only query functions (e.g., `getUserProfile`, `getProjects`) remain accessible to all principals."
+        "A pledge that would cause total pledged HH to exceed the project's max HH budget is rejected with an error.",
+        "A pledge that fits within the remaining HH budget is accepted normally.",
+        "A pledge of exactly the remaining HH budget is accepted.",
+        "A pledge of zero or negative HH is still rejected by existing validation."
       ]
     },
     {
-      "id": "REQ-8",
-      "text": "Update `MainApp.tsx` to call the `isParticipant` query after a user authenticates via Internet Identity. If the authenticated principal is not in the allowlist, display a clear, user-friendly message (e.g., 'Your identity is not yet authorized for this platform. Please contact the IASA administrator.') instead of rendering the `ProfileSetupModal` or `Dashboard`. Do not block the login flow itself — only gate the post-login content.",
+      "id": "REQ-2",
+      "text": "In the PledgeSection frontend component, display the remaining available HH budget (max HH budget minus total already pledged HH) and disable or prevent submission of the pledge form when the entered amount exceeds the remaining budget. Show a clear inline error or warning when the user attempts to exceed it.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "actor no valid? have you well defined who is participating? eg. simple every grupo.iasa.cl ID"
+          "it is important that pledges can be made only up to the maximum HH budget"
         ]
       },
       "acceptanceCriteria": [
-        "After login, `isParticipant` is called with the authenticated principal.",
-        "If `isParticipant` returns `false`, a dedicated 'Not Authorized' screen or inline message is shown instead of the app shell.",
-        "If `isParticipant` returns `true`, the existing flow (ProfileSetupModal or Dashboard) continues unchanged.",
-        "The unauthorized message is clear, professional, and mentions contacting an administrator.",
-        "Loading state is handled gracefully while the `isParticipant` query is in flight."
+        "The pledge input field shows the maximum allowed value (remaining HH budget).",
+        "Submitting a pledge amount greater than the remaining budget is blocked in the UI with a visible error message.",
+        "The remaining budget is recalculated and displayed correctly after each new pledge is approved or added.",
+        "When the project has no remaining HH budget, the pledge form is disabled and shows a 'Budget fully pledged' message."
       ]
     }
   ],
   "constraints": [
-    "Do not remove or break any existing stable variables or state already in the actor.",
-    "Access control must use a Result or variant error — never an uncaught trap — for unauthorized callers.",
-    "Read-only query functions must remain publicly accessible without allowlist restriction.",
-    "Frontend immutable paths (useInternetIdentity.ts, useActor.ts, main.tsx, components/ui) must not be modified."
+    "Do not change the project creation or task creation budget validation logic.",
+    "All Motoko logic must remain in the single main actor (backend/main.mo)."
   ],
   "nonGoals": [
-    "Implementing email-based or OAuth identity verification tied to the grupo.iasa.cl domain.",
-    "Automatic on-chain lookup or verification of grupo.iasa.cl email addresses.",
-    "Changes to the existing SquadRole, UserProfile, or gamification data model.",
-    "Any new project, task, or pledge features beyond access control."
+    "Changing how the HH budget itself is set during project creation.",
+    "Adding voting or reputation logic.",
+    "Modifying task-level budget enforcement."
   ],
   "imageRequirements": {
     "required": [],

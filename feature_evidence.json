@@ -2,12 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-mainapp-tsx-to-call-the-isparticipant-query-after-a-user-authenticates-via-internet-identity-if-the-authenticated-principal-is-not-in-the-allowlist-display-a-clear-user-friendly-message-e-g-your-identity-is-not-yet-authorized-for-this-platform-please-contact-the-iasa-administrator-instead-of-rendering-the-profilesetupmodal-or-dashboard-do-not-block-the-login-flow-itself-only-gate-the-post-login-content",
-      "featureTitle": "Update `MainApp.tsx` to call the `isParticipant` query after a user authenticates via Internet Identity. If the authenticated principal is not in the allowlist, display a clear, user-friendly message (e.g., 'Your identity is not yet authorized for this platform. Please contact the IASA administrator.') instead of rendering the `ProfileSetupModal` or `Dashboard`. Do not block the login flow itself — only gate the post-login content.",
+      "featureId": "feature-in-the-pledgesection-frontend-component-display-the-remaining-available-hh-budget-max-hh-budget-minus-total-already-pledged-hh-and-disable-or-prevent-submission-of-the-pledge-form-when-the-entered-amount-exceeds-the-remaining-budget-show-a-clear-inline-error-or-warning-when-the-user-attempts-to-exceed-it",
+      "featureTitle": "In the PledgeSection frontend component, display the remaining available HH budget (max HH budget minus total already pledged HH) and disable or prevent submission of the pledge form when the entered amount exceeds the remaining budget. Show a clear inline error or warning when the user attempts to exceed it.",
       "files": [
-        "frontend/src/components/MainApp.tsx",
-        "frontend/src/components/UnauthorizedScreen.tsx",
-        "frontend/src/hooks/useQueries.ts"
+        "frontend/src/components/PledgeSection.tsx"
       ],
       "components": [
         "authorization@1.0.1",
@@ -18,7 +16,7 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-8"
+        "REQ-2"
       ],
       "confidence": "high"
     }

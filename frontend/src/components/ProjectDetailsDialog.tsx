@@ -1,9 +1,11 @@
 import { Project } from '../backend';
+import { useGetPledges } from '../hooks/useQueries';
+import { useInternetIdentity } from '../hooks/useInternetIdentity';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { DollarSign, Clock, Users, ExternalLink, Info } from 'lucide-react';
+import { DollarSign, Clock, Users, ExternalLink, Info, CheckCircle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import PledgeSection from './PledgeSection';
@@ -18,7 +20,18 @@ interface ProjectDetailsDialogProps {
 }
 
 export default function ProjectDetailsDialog({ project, open, onOpenChange }: ProjectDetailsDialogProps) {
-  const pledgeProgress = (project.totalPledgedHH / project.estimatedTotalHH) * 100;
+  const { data: pledges = [] } = useGetPledges(project.id);
+  const { identity } = useInternetIdentity();
+
+  const isCreator = identity?.getPrincipal().toString() === project.creator.toString();
+
+  const approvedPledges = pledges.filter((p) => p.status === 'approved');
+  const pendingPledges = pledges.filter((p) => p.status === 'pending');
+  const totalApprovedHH = approvedPledges.reduce((sum, p) => sum + p.amount, 0);
+  const activationProgress = project.estimatedTotalHH > 0
+    ? Math.min((totalApprovedHH / project.estimatedTotalHH) * 100, 100)
+    : 0;
+
   const payoutPerHH = project.estimatedTotalHH > 0 ? project.finalMonetaryValue / project.estimatedTotalHH : 0;
 
   const getStatusColor = (status: string) => {
@@ -55,6 +68,21 @@ export default function ProjectDetailsDialog({ project, open, onOpenChange }: Pr
           </AlertDescription>
         </Alert>
 
+        {/* Active Project Banner */}
+        {project.status === 'active' && (
+          <Alert className="border-green-500/30 bg-green-500/5">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <AlertDescription className="text-green-700 dark:text-green-400">
+              This project is now <strong>active</strong>. No further pledging is allowed.
+              {totalApprovedHH > 0 && (
+                <span className="ml-1">
+                  ({totalApprovedHH.toFixed(1)} HH approved — {activationProgress.toFixed(0)}% of total)
+                </span>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Project Stats */}
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border p-4">
@@ -82,16 +110,36 @@ export default function ProjectDetailsDialog({ project, open, onOpenChange }: Pr
           </div>
         </div>
 
-        {/* Pledge Progress */}
+        {/* Pledge Progress (pledging status) */}
         {project.status === 'pledging' && (
           <div className="space-y-2 rounded-lg border p-4">
             <div className="flex justify-between text-sm">
-              <span className="font-medium">Pledge Progress</span>
+              <span className="font-medium">Activation Progress</span>
               <span className="text-muted-foreground">
-                {project.totalPledgedHH.toFixed(1)} / {project.estimatedTotalHH.toFixed(1)} HH
+                {totalApprovedHH.toFixed(1)} / {project.estimatedTotalHH.toFixed(1)} HH approved
+                ({activationProgress.toFixed(0)}%)
               </span>
             </div>
-            <Progress value={Math.min(pledgeProgress, 100)} className="h-2" />
+            <Progress value={activationProgress} className="h-2" />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Activation threshold: 80%</span>
+              <div className="flex items-center gap-3">
+                {pendingPledges.length > 0 ? (
+                  <span className="text-yellow-600 dark:text-yellow-400">
+                    ⏳ {pendingPledges.length} pledge(s) pending sign-off
+                  </span>
+                ) : approvedPledges.length > 0 ? (
+                  <span className="text-green-600 dark:text-green-400">
+                    ✓ All pledges signed off
+                  </span>
+                ) : null}
+                {isCreator && pendingPledges.length > 0 && (
+                  <span className="text-primary font-medium">
+                    → Go to Pledges tab to sign off
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -112,7 +160,14 @@ export default function ProjectDetailsDialog({ project, open, onOpenChange }: Pr
         <Tabs defaultValue="tasks" className="mt-4">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="tasks">Tasks</TabsTrigger>
-            <TabsTrigger value="pledges">Pledges</TabsTrigger>
+            <TabsTrigger value="pledges">
+              Pledges
+              {isCreator && pendingPledges.length > 0 && (
+                <Badge className="ml-1 h-4 w-4 rounded-full p-0 text-xs bg-yellow-500 text-white flex items-center justify-center">
+                  {pendingPledges.length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="payouts" disabled={project.status !== 'completed'}>
               Share of Pool
             </TabsTrigger>

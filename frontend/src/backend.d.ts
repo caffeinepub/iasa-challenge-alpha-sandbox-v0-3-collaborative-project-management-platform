@@ -7,17 +7,20 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface Challenge {
-    stakeHH: number;
-    taskId: bigint;
-    timestamp: Time;
-    challenger: Principal;
-}
 export type Time = bigint;
-export interface Pledge {
-    user: Principal;
-    pledgedHH: number;
+export type PledgeTarget = {
+    __kind__: "task";
+    task: bigint;
+} | {
+    __kind__: "otherTasks";
+    otherTasks: null;
+};
+export interface PeerRating {
     projectId: bigint;
+    timestamp: Time;
+    rating: number;
+    ratee: Principal;
+    rater: Principal;
 }
 export interface Task {
     id: bigint;
@@ -31,12 +34,19 @@ export interface Task {
     dependencies: Array<bigint>;
     auditStartTime?: Time;
 }
-export interface PeerRating {
+export interface Challenge {
+    stakeHH: number;
+    taskId: bigint;
+    timestamp: Time;
+    challenger: Principal;
+}
+export interface Pledge {
+    status: PledgeStatus;
+    user: Principal;
+    target: PledgeTarget;
     projectId: bigint;
     timestamp: Time;
-    rating: number;
-    ratee: Principal;
-    rater: Principal;
+    amount: number;
 }
 export interface Vote {
     weight: number;
@@ -70,6 +80,11 @@ export interface Project {
     finalMonetaryValue: number;
     estimatedTotalHH: number;
 }
+export enum PledgeStatus {
+    pending = "pending",
+    approved = "approved",
+    reassigned = "reassigned"
+}
 export enum ProjectStatus {
     active = "active",
     completed = "completed",
@@ -79,7 +94,8 @@ export enum ProjectStatus {
 export enum SquadRole {
     Journeyman = "Journeyman",
     Mentor = "Mentor",
-    Apprentice = "Apprentice"
+    Apprentice = "Apprentice",
+    Masters = "Masters"
 }
 export enum TaskStatus {
     active = "active",
@@ -100,34 +116,13 @@ export enum Variant_finalPrize_challenge_taskProposal {
     taskProposal = "taskProposal"
 }
 export interface backendInterface {
-    /**
-     * / Accept (self-assign) a task. Requires #user role and project participation.
-     */
     acceptTask(taskId: bigint): Promise<void>;
-    /**
-     * / Approve a task after the audit window. Requires #user role; caller must be project creator or admin.
-     */
     approveTask(taskId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    /**
-     * / Challenge a task during its audit window. Requires #user role and project participation.
-     */
     challengeTask(taskId: bigint, stakeHH: number): Promise<void>;
-    /**
-     * / Complete a project. Requires #user role; caller must be project creator or admin.
-     */
     completeProject(projectId: bigint): Promise<void>;
-    /**
-     * / Mark a task as complete (moves to audit). Requires #user role; caller must be assignee.
-     */
     completeTask(taskId: bigint): Promise<void>;
-    /**
-     * / Create a new project. Requires #user role.
-     */
-    createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null): Promise<bigint>;
-    /**
-     * / Create a task within a project. Requires #user role and project participation.
-     */
+    createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null, otherTasksPoolHH: number): Promise<bigint>;
     createTask(projectId: bigint, title: string, description: string, hhBudget: number, dependencies: Array<bigint>): Promise<bigint>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
@@ -140,21 +135,11 @@ export interface backendInterface {
     getVotes(targetId: bigint): Promise<Array<Vote>>;
     initializeAccessControl(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
-    /**
-     * / Pledge hours to a project. Requires #user role.
-     */
-    pledgeHH(projectId: bigint, pledgedHH: number): Promise<void>;
-    /**
-     * / Submit a peer rating. Requires #user role and project participation.
-     */
+    pledgeToTask(projectId: bigint, target: PledgeTarget, amount: number): Promise<void>;
     ratePeer(ratee: Principal, projectId: bigint, rating: number): Promise<void>;
-    /**
-     * / Register the calling principal as a participant. Requires #user role.
-     */
+    reassignFromOtherTasks(pledgeId: bigint, newTaskId: bigint): Promise<void>;
     registerUser(username: string, role: SquadRole): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    /**
-     * / Cast a vote. Requires #user role and relevant project participation.
-     */
+    signOffPledge(pledgeId: bigint): Promise<void>;
     vote(targetId: bigint, voteType: Variant_finalPrize_challenge_taskProposal): Promise<void>;
 }

@@ -66,6 +66,7 @@ export default function ProfileSetupModal() {
                 <SelectItem value={SquadRole.Apprentice}>Apprentice</SelectItem>
                 <SelectItem value={SquadRole.Journeyman}>Journeyman</SelectItem>
                 <SelectItem value={SquadRole.Mentor}>Mentor</SelectItem>
+                <SelectItem value={SquadRole.Masters}>Masters</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">

@@ -1,17 +1,10 @@
 # Specification
 
 ## Summary
-**Goal:** Define and enforce participant identity and access control so that only authorized ICP principals can perform state-mutating operations, and unauthorized users see a clear message after login.
+**Goal:** Enforce a maximum HH budget cap on project pledges, both in the backend and frontend.
 
 **Planned changes:**
-- Add a stable allowlist data structure (`allowedPrincipals`) to the backend actor that survives upgrades.
-- Add admin-only `addParticipant(p: Principal)` and `removeParticipant(p: Principal)` functions for runtime management.
-- Ensure the deployer/admin principal is set on first deploy so the allowlist is never empty.
-- Guard all state-mutating functions (`registerUser`, `createProject`, `pledgeHours`, `createTask`, `completeTask`, `submitPeerRating`) with an allowlist check that returns a `#Unauthorized` error variant instead of trapping.
-- Expose a public query `isParticipant(p: Principal): Bool` for frontend eligibility checks.
-- Keep all read-only query functions publicly accessible without allowlist restriction.
-- Update `MainApp.tsx` to call `isParticipant` after Internet Identity login and show a professional "not authorized" message (mentioning contacting the IASA administrator) if the principal is not in the allowlist.
-- Handle loading state gracefully while the `isParticipant` query is in flight.
-- Continue the existing post-login flow (ProfileSetupModal or Dashboard) unchanged for authorized principals.
+- Backend: When a pledge is submitted, validate that the sum of all existing approved and pending pledges plus the new pledge amount does not exceed the project's maximum HH budget; reject with a descriptive error if it would.
+- Frontend (PledgeSection): Display the remaining available HH budget (max HH budget minus total already pledged), show an inline error when the entered amount exceeds the remaining budget, disable the pledge form when no budget remains, and show a "Budget fully pledged" message in that case.
 
-**User-visible outcome:** After logging in, unauthorized users see a clear message that their identity is not yet authorized and should contact the IASA administrator, while authorized users proceed normally to the app.
+**User-visible outcome:** Users can only pledge HH up to the project's remaining budget. Attempting to exceed it is blocked in the UI with a clear error, and the backend also rejects any such pledge as a safeguard.

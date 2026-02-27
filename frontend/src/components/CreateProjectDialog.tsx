@@ -15,6 +15,7 @@ export default function CreateProjectDialog() {
   const [estimatedHH, setEstimatedHH] = useState('');
   const [monetaryValue, setMonetaryValue] = useState('');
   const [resourceLink, setResourceLink] = useState('');
+  const [otherTasksPoolHH, setOtherTasksPoolHH] = useState('');
 
   const createProject = useCreateProject();
 
@@ -28,6 +29,7 @@ export default function CreateProjectDialog() {
 
     const hhValue = parseFloat(estimatedHH);
     const moneyValue = parseFloat(monetaryValue);
+    const poolHH = otherTasksPoolHH ? parseFloat(otherTasksPoolHH) : 0;
 
     if (isNaN(hhValue) || hhValue <= 0) {
       toast.error('Estimated HH must be a positive number');
@@ -39,6 +41,16 @@ export default function CreateProjectDialog() {
       return;
     }
 
+    if (isNaN(poolHH) || poolHH < 0) {
+      toast.error('Other Tasks pool HH must be a non-negative number');
+      return;
+    }
+
+    if (poolHH > hhValue) {
+      toast.error('Other Tasks pool HH cannot exceed total estimated HH');
+      return;
+    }
+
     try {
       await createProject.mutateAsync({
         title: title.trim(),
@@ -46,6 +58,7 @@ export default function CreateProjectDialog() {
         estimatedTotalHH: hhValue,
         finalMonetaryValue: moneyValue,
         sharedResourceLink: resourceLink.trim() || null,
+        otherTasksPoolHH: poolHH,
       });
       toast.success('Project created successfully!');
       setOpen(false);
@@ -54,6 +67,7 @@ export default function CreateProjectDialog() {
       setEstimatedHH('');
       setMonetaryValue('');
       setResourceLink('');
+      setOtherTasksPoolHH('');
     } catch (error: any) {
       toast.error(error.message || 'Failed to create project');
     }
@@ -126,6 +140,23 @@ export default function CreateProjectDialog() {
                 disabled={createProject.isPending}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="otherTasksPoolHH">Other Tasks Pool HH</Label>
+            <Input
+              id="otherTasksPoolHH"
+              type="number"
+              step="0.1"
+              min="0"
+              placeholder="10 (default: 0)"
+              value={otherTasksPoolHH}
+              onChange={(e) => setOtherTasksPoolHH(e.target.value)}
+              disabled={createProject.isPending}
+            />
+            <p className="text-xs text-muted-foreground">
+              HH reserved for the "Other Tasks" pool. The PM can reassign these hours to specific tasks later.
+            </p>
           </div>
 
           <div className="space-y-2">

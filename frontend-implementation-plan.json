@@ -1,33 +1,22 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Define and enforce participant identity / access control",
+  "title": "Enforce maximum HH budget cap on pledges",
   "requirements": [
     {
-      "id": "REQ-8",
-      "summary": "Check participant allowlist after authentication and show authorization status to user",
+      "id": "REQ-2",
+      "summary": "Display remaining HH budget in PledgeSection and prevent pledges that exceed the project's maximum HH budget",
       "acceptanceCriteria": [
-        "After login, `isParticipant` is called with the authenticated principal.",
-        "If `isParticipant` returns `false`, a dedicated 'Not Authorized' screen or inline message is shown instead of the app shell.",
-        "If `isParticipant` returns `true`, the existing flow (ProfileSetupModal or Dashboard) continues unchanged.",
-        "The unauthorized message is clear, professional, and mentions contacting an administrator.",
-        "Loading state is handled gracefully while the `isParticipant` query is in flight."
+        "The pledge input field shows the maximum allowed value (remaining HH budget).",
+        "Submitting a pledge amount greater than the remaining budget is blocked in the UI with a visible error message.",
+        "The remaining budget is recalculated and displayed correctly after each new pledge is approved or added.",
+        "When the project has no remaining HH budget, the pledge form is disabled and shows a 'Budget fully pledged' message."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/MainApp.tsx",
+          "path": "frontend/src/components/PledgeSection.tsx",
           "operation": "modify",
-          "description": "Add a call to `isParticipant` query after authentication. If the query returns `false`, render an UnauthorizedScreen component instead of ProfileSetupModal or Dashboard. Ensure proper loading state handling while the `isParticipant` check is in flight. The existing authentication flow and ProfileSetupModal logic remain unchanged when the user is authorized."
-        },
-        {
-          "path": "frontend/src/components/UnauthorizedScreen.tsx",
-          "operation": "create",
-          "description": "Create a new component that displays a clear, professional message when an authenticated user is not in the participant allowlist. The message should state 'Your identity is not yet authorized for this platform. Please contact the IASA administrator.' and include the IASA logo from `frontend/public/assets/generated/iasa-logo-transparent.dim_200x200.png`. Use Tailwind styling consistent with LoginScreen component. Include a logout button so unauthorized users can switch identities."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Add a new `useIsParticipant` query hook that calls the backend `isParticipant` method with the authenticated principal. The hook should be enabled only when the actor is available and the user is authenticated. Return loading, error, and data states. Use the same pattern as other query hooks in this file for consistency."
+          "description": "Calculate and display the remaining HH budget (project.estimatedTotalHH minus project.totalPledgedHH). Add validation to the pledge form that prevents submission when the entered amount exceeds the remaining budget. Show an inline error message when the user attempts to exceed the remaining budget. Disable the pledge form entirely when remaining budget is zero or negative, displaying 'Budget fully pledged' message. Update the UI to prominently show the remaining budget available for pledging near the pledge input field."
         }
       ]
     }
