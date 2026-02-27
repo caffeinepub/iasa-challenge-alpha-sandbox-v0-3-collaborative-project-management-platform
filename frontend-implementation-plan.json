@@ -1,71 +1,71 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix draft dialog and clarify task/pledge/approval lifecycle flow",
+  "title": "Participation Levels, Voting Power, and Role Mapping - Frontend",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Fix ProjectDetailsDialog so it opens correctly when triggered from ProjectCard without rendering or state errors",
+      "id": "REQ-4",
+      "summary": "Add participation level selector to ProfileSetupModal with descriptions for Apprentice, Journeyman, Master, and Guest Artist",
       "acceptanceCriteria": [
-        "Clicking 'Open' or the details button on any ProjectCard opens the ProjectDetailsDialog without errors.",
-        "The dialog renders all tabs (Tasks, Pledges, Share of Pool, Peer Ratings) without crashing.",
-        "The dialog opens for projects in all statuses (drafting, pledging, active, completed)."
+        "ProfileSetupModal presents all four participation levels with their descriptive subtitles.",
+        "A level must be selected before the form can be submitted.",
+        "The selected participationLevel is passed to the backend registration call.",
+        "After profile creation, the participation level field is read-only for non-admin users."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/ProjectDetailsDialog.tsx",
+          "path": "frontend/src/components/ProfileSetupModal.tsx",
           "operation": "modify",
-          "description": "Investigate and fix the dialog mounting issue. Verify the open prop is properly handled, ensure all state initialization is safe (e.g., null-check project data before rendering tabs), add error boundaries if needed, and confirm the Dialog component from shadcn/ui is correctly wired with the open state. Test that the dialog can mount for projects in all statuses without crashing."
-        },
-        {
-          "path": "frontend/src/components/ProjectCard.tsx",
-          "operation": "modify",
-          "description": "Verify the button click handler correctly sets the dialog open state and passes the correct project data to ProjectDetailsDialog. Ensure no conflicting state updates or event handlers prevent the dialog from opening."
+          "description": "Replace the existing squad role selector with a participation level selector that displays all four levels (Apprentice, Journeyman, Master, Guest Artist) with concise descriptions. Update the form to pass the selected participationLevel to the backend registerUser call. Ensure the level selector is required before submission. The existing username field and modal structure remain intact."
         }
       ]
     },
     {
-      "id": "REQ-2",
-      "summary": "Clearly display the sequential lifecycle conditions for tasks with visually distinct status badges and action buttons that reflect the current state",
+      "id": "REQ-5",
+      "summary": "Display participation level and derived voting power in Header dropdown and Dashboard scorecards",
       "acceptanceCriteria": [
-        "Each TaskCard shows the current task status (open, inProgress, completed, approved) as a clearly labelled badge.",
-        "Action buttons on TaskCard are only shown when the task is in the correct state for that action (e.g., 'Pledge' only when task is open, 'Approve' only when task is completed).",
-        "A short inline label or tooltip on each TaskCard explains what the next required step is (e.g., 'Awaiting pledge confirmation by PM').",
-        "The task lifecycle sequence is visually readable without needing external documentation."
+        "Header dropdown shows the user's participation level label and their current voting power.",
+        "Dashboard scorecard reflects voting power derived from participation level.",
+        "Guest Artist participants show voting power of 4 in all relevant UI locations."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/TaskCard.tsx",
+          "path": "frontend/src/components/Header.tsx",
           "operation": "modify",
-          "description": "Add a prominent status badge component that maps TaskStatus enum values to user-friendly labels (e.g., 'proposed' → 'Open', 'inProgress' → 'In Progress', 'completed' → 'Completed', 'taskConfirmed' → 'Approved'). Use distinct colors for each status. Add conditional logic to show action buttons only when the task is in the correct state: show 'Pledge' only when status is 'proposed', 'Accept' only when status is 'taskConfirmed' and user is not assigned, 'Complete' only when status is 'inProgress' and user is the assignee, 'Approve' only when status is 'completed' and user is the PM, 'Confirm' only when status is 'proposed' and user is the PM. Add a next-step indicator (e.g., inline label or tooltip) that explains the required action based on the current status and role (e.g., 'Awaiting pledge confirmation by PM', 'Awaiting task acceptance', 'Awaiting completion by assignee', 'Awaiting PM approval')."
+          "description": "Update the user dropdown menu to display the participation level (e.g., 'Apprentice', 'Journeyman', 'Master', 'Guest Artist') alongside or replacing the current squad role display. Show the derived voting power value from the user profile. Ensure the display accurately reflects the backend-computed voting power based on participation level."
         },
         {
-          "path": "frontend/src/components/TasksSection.tsx",
+          "path": "frontend/src/components/Dashboard.tsx",
           "operation": "modify",
-          "description": "Update the budget info banner to clarify that pending pledges are not yet counted in the confirmed HH budget. Add a legend or tooltip explaining task lifecycle states if needed to support the TaskCard changes."
+          "description": "Update the scorecards section to display the user's participation level and derived voting power prominently. Replace or supplement the existing voting power display to show the level-based value (Apprentice→0, Journeyman→1, Master→3, GuestArtist→4). Ensure the scorecard layout remains responsive and consistent with the existing design."
         }
       ]
     },
     {
-      "id": "REQ-3",
-      "summary": "Clearly display the sequential lifecycle conditions for pledges with status badges and next-action indicators",
+      "id": "REQ-6",
+      "summary": "Create Administrator-only panel for changing participant participation levels",
       "acceptanceCriteria": [
-        "Each pledge entry in PledgeSection shows a status badge: 'Pending', 'Confirmed', or 'Expired'.",
-        "Pending pledges display a note such as 'Awaiting PM confirmation — not yet counted in budget'.",
-        "Confirmed pledges display a note such as 'Confirmed — included in HH budget and payout calculation'.",
-        "Expired pledges are visually de-emphasised and labelled 'Expired'.",
-        "PM-only confirm/reject buttons are visible only for pending pledges and only to the PM."
+        "Admin panel is only rendered when the authenticated principal matches the Administrator.",
+        "Admin panel lists all registered users with their current participation level.",
+        "Admin can change any user's participation level via a dropdown/select control.",
+        "On save, the backend updateParticipationLevel function is called and the UI reflects the updated level immediately.",
+        "No admin controls are visible to non-admin users."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/PledgeSection.tsx",
-          "operation": "modify",
-          "description": "Add a status badge component for each pledge that maps PledgeStatus enum values to user-friendly labels ('pending' → 'Pending', 'confirmed' → 'Confirmed', 'expired' → 'Expired'). Use distinct colors for each status. For pending pledges, add an inline note: 'Awaiting PM confirmation — not yet counted in budget'. For confirmed pledges, add a note: 'Confirmed — included in HH budget and payout calculation'. For expired pledges, apply a muted/greyed-out visual style and label them 'Expired'. Ensure PM-only confirm/reassign buttons are only visible for pending pledges and only to the project creator (PM). Update the section header or intro text to explain the pledge lifecycle sequence: (1) Participant submits pledge (pending), (2) PM confirms pledge (confirmed, counted in budget), (3) Expired if not confirmed in time."
+          "path": "frontend/src/components/AdminPanel.tsx",
+          "operation": "create",
+          "description": "Create a new AdminPanel component that fetches and displays all registered users with their current participation levels. Include a dropdown/select control for each user to change their participation level. On save, call the backend updateParticipationLevel function and invalidate relevant queries to refresh the UI. The component must check the caller's admin status using the isCallerAdmin backend method and render nothing if the user is not an admin. Use authorization component patterns to guard access."
         },
         {
-          "path": "frontend/src/components/ShareOfPoolSection.tsx",
+          "path": "frontend/src/components/MainApp.tsx",
           "operation": "modify",
-          "description": "Add a note at the top of the section clarifying that only confirmed pledges are included in the share-of-pool calculation, and pending/expired pledges are excluded. This reinforces the pledge lifecycle for users viewing their potential payout."
+          "description": "Wire the AdminPanel component into the main app layout. Import and render AdminPanel conditionally after authentication is confirmed. Position it appropriately in the UI (e.g., below the header or as a separate admin tab). The panel will self-guard based on admin status, so no additional wrapping guard is needed in MainApp."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add a React Query mutation hook useUpdateParticipationLevel that wraps the backend updateParticipationLevel function. Ensure it accepts a user Principal and a ParticipationLevel enum value. On success, invalidate the currentUserProfile and any user-list queries to refresh the UI. Add error handling with toast notifications for authorization failures."
         }
       ]
     }

@@ -1,16 +1,16 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the ProjectDetailsDialog so it opens correctly from a ProjectCard, and clarify the task/pledge/approval lifecycle flow with clear status badges and contextual labels throughout the UI.
+**Goal:** Introduce four participation levels (Apprentice, Journeyman, Master, Guest Artist) with associated voting power, enforce role assignment constraints based on level, and provide admin controls to manage participant levels.
 
 **Planned changes:**
-- Fix the ProjectDetailsDialog (draft view) so it mounts and renders without errors when triggered from any ProjectCard, for all project statuses (drafting, pledging, active, completed).
-- Add clearly labelled status badges to each TaskCard reflecting the current task state: open, inProgress, completed, approved.
-- Show action buttons on TaskCard only when the task is in the correct state for that action (e.g., "Pledge" only when open, "Approve" only when completed).
-- Add an inline label or tooltip on each TaskCard indicating the next required step (e.g., "Awaiting pledge confirmation by PM").
-- Add status badges to each pledge entry in PledgeSection: Pending, Confirmed, or Expired.
-- Show contextual notes on pledges explaining their meaning (e.g., "Awaiting PM confirmation — not yet counted in budget" for pending; "Confirmed — included in HH budget and payout calculation" for confirmed).
-- Visually de-emphasise expired pledges and label them accordingly.
-- Show PM-only confirm/reject buttons only for pending pledges and only to the PM.
+- Add a `ParticipationLevel` type to the backend with values: Apprentice, Journeyman, Master, GuestArtist, each carrying a derived voting power (0, 1, 3, 4 respectively).
+- Store `participationLevel` on each `UserProfile`; derive voting power from it.
+- Allow participants to self-select their participation level once during profile setup; lock it afterward for non-admin users.
+- Add a backend `setParticipationLevel` function restricted to the Administrator principal (jv@grupoiasa.cl).
+- Enforce role assignment constraints: PM → Journeyman or Master only; Mentor/PO → Master or Guest Artist only; Team Player → Apprentice, Journeyman, or Master; Administrator → admin principal only.
+- Update `ProfileSetupModal` to include a participation level selector with descriptions for each level; require selection before submission; make the field read-only post-registration for non-admin users.
+- Display the user's participation level and derived voting power in the Header user dropdown and Dashboard scorecard.
+- Add an Administrator-only UI panel listing all users with their participation levels, allowing the admin to change any user's level via a dropdown and save it to the backend.
 
-**User-visible outcome:** Users can open project detail dialogs from any ProjectCard without errors, and can clearly understand the current state and next required action for every task and pledge without needing external documentation.
+**User-visible outcome:** During profile setup, users select their participation level (Apprentice, Journeyman, Master, or Guest Artist), which determines their voting power and eligible roles. Admins can override any participant's level via a dedicated admin panel. Participation level and voting power are visible in the header dropdown and dashboard scorecard.

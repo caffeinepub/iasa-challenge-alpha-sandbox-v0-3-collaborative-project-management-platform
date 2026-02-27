@@ -1,40 +1,92 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [],
-  "known_issues": [
-    "Draft does not open in Version 11 deployment"
+  "summary": "A participation/voting system with tiered levels and role mapping. Participants have levels (Apprentice, Journeyman, Master, Guest Artist) with corresponding voting power (0, 1, 3, 4). Roles include Project Manager, Mentor/Product Owner, Team Player, and Administrator. Level changes are restricted to Administrator only.",
+  "architectural_notes": [
+    "Participation levels: Apprentice, Journeyman, Master, Guest Artist — with voting power 0, 1, 3, 4 respectively",
+    "Roles: PM (Journeyman/Master), Mentor/PO (Master/Guest Artist), Team Player (any), Administrator (jv@grupoiasa.cl)",
+    "Participant level is immutable by the participant; only Administrator can modify it"
   ],
-  "isFixRequest": true,
+  "known_issues": [],
+  "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-fix-the-projectdetailsdialog-draft-view-so-that-it-opens-correctly-when-triggered-from-a-projectcard-investigate-and-resolve-any-rendering-or-state-error-that-prevents-the-dialog-from-mounting-in-the-current-deployment",
-      "title": "Fix the ProjectDetailsDialog (draft view) so that it opens correctly when triggered from a ProjectCard. Investigate and resolve any rendering or state error that prevents the dialog from mounting in the current deployment.",
+      "id": "feature-update-the-profilesetupmodal-to-include-a-participation-level-selector-apprentice-journeyman-master-guest-artist-with-concise-descriptions-for-each-the-selected-level-must-be-submitted-to-the-backend-during-profile-registration",
+      "title": "Update the ProfileSetupModal to include a participation level selector (Apprentice, Journeyman, Master, Guest Artist) with concise descriptions for each. The selected level must be submitted to the backend during profile registration.",
       "reqIds": [
-        "REQ-1"
+        "REQ-4"
       ],
       "version": 1
     },
     {
-      "id": "feature-in-the-tasks-section-and-taskcard-components-clearly-display-the-sequential-lifecycle-conditions-for-a-task-1-task-is-created-by-pm-in-open-state-2-a-participant-pledges-hh-hours-to-the-task-pledge-status-pending-3-pm-confirms-the-pledge-pledge-status-confirmed-4-once-the-task-has-sufficient-confirmed-pledges-the-pm-can-set-the-task-to-inprogress-5-the-assignee-marks-the-task-as-completed-6-pm-approves-the-task-completion-task-status-approved-each-state-transition-should-be-visually-distinct-with-a-status-badge-or-label",
-      "title": "In the Tasks section and TaskCard components, clearly display the sequential lifecycle conditions for a task: (1) Task is created by PM in 'open' state; (2) A participant pledges HH hours to the task (pledge status = 'pending'); (3) PM confirms the pledge (pledge status = 'confirmed'); (4) Once the task has sufficient confirmed pledges, the PM can set the task to 'inProgress'; (5) The assignee marks the task as 'completed'; (6) PM approves the task completion (task status = 'approved'). Each state transition should be visually distinct with a status badge or label.",
+      "id": "feature-display-the-participant-s-participation-level-e-g-apprentice-journeyman-master-guest-artist-and-their-derived-voting-power-in-the-header-user-dropdown-and-in-the-dashboard-scorecard-replacing-or-supplementing-any-previously-generic-role-voting-power-display",
+      "title": "Display the participant's participation level (e.g., 'Apprentice', 'Journeyman', 'Master', 'Guest Artist') and their derived voting power in the Header user dropdown and in the Dashboard scorecard, replacing or supplementing any previously generic role/voting-power display.",
       "reqIds": [
-        "REQ-2"
+        "REQ-5"
       ],
       "version": 1
     },
     {
-      "id": "feature-in-the-pledgesection-component-clearly-display-the-sequential-lifecycle-conditions-for-a-pledge-1-participant-submits-a-pledge-status-pending-not-counted-in-confirmed-budget-2-pm-reviews-and-confirms-the-pledge-status-confirmed-now-counted-in-hh-budget-and-share-of-pool-3-if-not-confirmed-within-the-expiry-window-pledge-becomes-expired-show-each-pledge-with-its-current-status-and-indicate-what-action-is-needed-next-e-g-awaiting-pm-confirmation",
-      "title": "In the PledgeSection component, clearly display the sequential lifecycle conditions for a pledge: (1) Participant submits a pledge (status = 'pending', not counted in confirmed budget); (2) PM reviews and confirms the pledge (status = 'confirmed', now counted in HH budget and Share of Pool); (3) If not confirmed within the expiry window, pledge becomes 'expired'. Show each pledge with its current status and indicate what action is needed next (e.g., 'Awaiting PM confirmation').",
+      "id": "feature-provide-an-administrator-only-ui-panel-accessible-only-when-logged-in-as-the-administrator-principal-jv-grupoiasa-cl-that-allows-changing-any-participant-s-participation-level-this-panel-must-not-be-visible-or-accessible-to-non-admin-users",
+      "title": "Provide an Administrator-only UI panel (accessible only when logged in as the Administrator principal jv@grupoiasa.cl) that allows changing any participant's participation level. This panel must not be visible or accessible to non-admin users.",
       "reqIds": [
-        "REQ-3"
+        "REQ-6"
       ],
       "version": 1
     }
   ],
-  "new_feature_requests": [],
-  "projectName": "Fix draft dialog and clarify task/pledge/approval lifecycle flow",
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Participation levels: Apprentice (VP=0), Journeyman (VP=1), Master (VP=3), Guest Artist/Mentor (VP=4)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Voting power assigned per participation level; used in decision-making flows",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Participant level is self-selected once, then locked — only Administrator (jv@grupoiasa.cl) can change it",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Role mapping: PM (Journeyman or Master), Mentor/Product Owner (Master or Guest Artist), Team Player (any level), Administrator (jv@grupoiasa.cl)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Define four participation levels in the backend data model: Apprentice (student/young professional), Journeyman (project leader), Master (senior professional), and Guest Artist (external professional). Each level must carry an initial voting power: Apprentice = 0, Journeyman = 1, Master = 3, Guest Artist = 4.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Allow a participant to self-select their participation level once during profile setup. After the initial selection, the level must be locked and can only be modified by the Administrator (principal associated with jv@grupoiasa.cl).",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Enforce role assignment constraints in the backend: Project Manager (PM) role may only be assigned to Journeyman or Master participants; Mentor/Product Owner role may only be assigned to Master or Guest Artist participants; Team Player role is open to Apprentice, Journeyman, or Master; Administrator role is reserved for jv@grupoiasa.cl.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "status": "pending"
+    }
+  ],
+  "gameProjectType": "none",
+  "projectName": "IASA Challenge",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

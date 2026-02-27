@@ -1,75 +1,137 @@
 {
   "kind": "build_request",
-  "title": "Fix draft dialog and clarify task/pledge/approval lifecycle flow",
-  "priority": "high",
+  "title": "Participation Levels, Voting Power, and Role Mapping",
+  "projectName": "IASA Challenge",
+  "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the ProjectDetailsDialog (draft view) so that it opens correctly when triggered from a ProjectCard. Investigate and resolve any rendering or state error that prevents the dialog from mounting in the current deployment.",
-      "target": "frontend",
+      "text": "Define four participation levels in the backend data model: Apprentice (student/young professional), Journeyman (project leader), Master (senior professional), and Guest Artist (external professional). Each level must carry an initial voting power: Apprentice = 0, Journeyman = 1, Master = 3, Guest Artist = 4.",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-latest"
         ],
         "quotes": [
-          "it is not working (draft does not open)"
+          "Initial voting power of apprentices should be 0, of journeyman 1,0, of masters 3,0 and of invited artists /mentors 4,0"
         ]
       },
       "acceptanceCriteria": [
-        "Clicking 'Open' or the details button on any ProjectCard opens the ProjectDetailsDialog without errors.",
-        "The dialog renders all tabs (Tasks, Pledges, Share of Pool, Peer Ratings) without crashing.",
-        "The dialog opens for projects in all statuses (drafting, pledging, active, completed)."
+        "Backend defines a ParticipationLevel variant with values: #Apprentice, #Journeyman, #Master, #GuestArtist.",
+        "Each UserProfile stores a participationLevel field.",
+        "Voting power is derived from participationLevel: Apprentice→0, Journeyman→1, Master→3, GuestArtist→4.",
+        "The existing votingPower field (if any) is replaced or updated to be computed from participationLevel."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "In the Tasks section and TaskCard components, clearly display the sequential lifecycle conditions for a task: (1) Task is created by PM in 'open' state; (2) A participant pledges HH hours to the task (pledge status = 'pending'); (3) PM confirms the pledge (pledge status = 'confirmed'); (4) Once the task has sufficient confirmed pledges, the PM can set the task to 'inProgress'; (5) The assignee marks the task as 'completed'; (6) PM approves the task completion (task status = 'approved'). Each state transition should be visually distinct with a status badge or label.",
-      "target": "frontend",
+      "text": "Allow a participant to self-select their participation level once during profile setup. After the initial selection, the level must be locked and can only be modified by the Administrator (principal associated with jv@grupoiasa.cl).",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-latest"
         ],
         "quotes": [
-          "simply clarify the conditions (sequence) of tasks, pledge and respective approval"
+          "Once the level of participant was selected by the participant, it can only be changed by the Administrator."
         ]
       },
       "acceptanceCriteria": [
-        "Each TaskCard shows the current task status (open, inProgress, completed, approved) as a clearly labelled badge.",
-        "Action buttons on TaskCard are only shown when the task is in the correct state for that action (e.g., 'Pledge' only when task is open, 'Approve' only when task is completed).",
-        "A short inline label or tooltip on each TaskCard explains what the next required step is (e.g., 'Awaiting pledge confirmation by PM').",
-        "The task lifecycle sequence is visually readable without needing external documentation."
+        "Profile setup (registerUser or equivalent) accepts a participationLevel parameter.",
+        "Subsequent calls to change participationLevel by non-admin principals are rejected with an authorization error.",
+        "A dedicated backend function (e.g., setParticipationLevel) is restricted to the Administrator principal.",
+        "The Administrator principal is initialised to the identity corresponding to jv@grupoiasa.cl."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "In the PledgeSection component, clearly display the sequential lifecycle conditions for a pledge: (1) Participant submits a pledge (status = 'pending', not counted in confirmed budget); (2) PM reviews and confirms the pledge (status = 'confirmed', now counted in HH budget and Share of Pool); (3) If not confirmed within the expiry window, pledge becomes 'expired'. Show each pledge with its current status and indicate what action is needed next (e.g., 'Awaiting PM confirmation').",
-      "target": "frontend",
+      "text": "Enforce role assignment constraints in the backend: Project Manager (PM) role may only be assigned to Journeyman or Master participants; Mentor/Product Owner role may only be assigned to Master or Guest Artist participants; Team Player role is open to Apprentice, Journeyman, or Master; Administrator role is reserved for jv@grupoiasa.cl.",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "msg-latest"
         ],
         "quotes": [
-          "simply clarify the conditions (sequence) of tasks, pledge and respective approval"
+          "Project Manager (PM): Responsible for the process, task specification, HH estimation, and providing sufficient documentation. Can be a Journeyman or Master.",
+          "Mentor, responsible for \"Product Ownership\": Responsible for the process, quality guidance, and final validation (Sign-off). Can be a master or guest artist.",
+          "Team Player: Responsible for execution and delivery of the \"Event E\" (Artifact, deliverable). Any professional (Apprentice, Journeyman or Master)",
+          "Administrator: jv@grupoiasa.cl; with privileges to make adjustments."
         ]
       },
       "acceptanceCriteria": [
-        "Each pledge entry in PledgeSection shows a status badge: 'Pending', 'Confirmed', or 'Expired'.",
-        "Pending pledges display a note such as 'Awaiting PM confirmation — not yet counted in budget'.",
-        "Confirmed pledges display a note such as 'Confirmed — included in HH budget and payout calculation'.",
-        "Expired pledges are visually de-emphasised and labelled 'Expired'.",
-        "PM-only confirm/reject buttons are visible only for pending pledges and only to the PM."
+        "Assigning PM role to an Apprentice or GuestArtist is rejected by the backend with a descriptive error.",
+        "Assigning Mentor/PO role to an Apprentice or Journeyman is rejected by the backend.",
+        "Team Player role is accepted for Apprentice, Journeyman, and Master.",
+        "Administrator role assignment is restricted to the jv@grupoiasa.cl principal."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Update the ProfileSetupModal to include a participation level selector (Apprentice, Journeyman, Master, Guest Artist) with concise descriptions for each. The selected level must be submitted to the backend during profile registration.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "Level of Participants: Apprentice (student, young professional) Journeyman (project leader) Master (senior professional) Guest artist (external professional)"
+        ]
+      },
+      "acceptanceCriteria": [
+        "ProfileSetupModal presents all four participation levels with their descriptive subtitles.",
+        "A level must be selected before the form can be submitted.",
+        "The selected participationLevel is passed to the backend registration call.",
+        "After profile creation, the participation level field is read-only for non-admin users."
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "text": "Display the participant's participation level (e.g., 'Apprentice', 'Journeyman', 'Master', 'Guest Artist') and their derived voting power in the Header user dropdown and in the Dashboard scorecard, replacing or supplementing any previously generic role/voting-power display.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "Initial voting power of apprentices should be 0, of journeyman 1,0, of masters 3,0 and of invited artists /mentors 4,0"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Header dropdown shows the user's participation level label and their current voting power.",
+        "Dashboard scorecard reflects voting power derived from participation level.",
+        "Guest Artist participants show voting power of 4 in all relevant UI locations."
+      ]
+    },
+    {
+      "id": "REQ-6",
+      "text": "Provide an Administrator-only UI panel (accessible only when logged in as the Administrator principal jv@grupoiasa.cl) that allows changing any participant's participation level. This panel must not be visible or accessible to non-admin users.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "Administrator: jv@grupoiasa.cl; with privileges to make adjustments.",
+          "Once the level of participant was selected by the participant, it can only be changed by the Administrator."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Admin panel is only rendered when the authenticated principal matches the Administrator.",
+        "Admin panel lists all registered users with their current participation level.",
+        "Admin can change any user's participation level via a dropdown/select control.",
+        "On save, the backend setParticipationLevel function is called and the UI reflects the updated level immediately.",
+        "No admin controls are visible to non-admin users."
       ]
     }
   ],
   "constraints": [
-    "Do not change the backend data model or pledge/task status enumerations.",
-    "Do not modify files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui.",
-    "All lifecycle labels and status badges must reflect actual backend state — do not introduce UI-only pseudo-states."
+    "Administrator identity must be the principal corresponding to jv@grupoiasa.cl — do not use a hardcoded string match; bind it during canister initialization or via a dedicated admin-registration step.",
+    "All Motoko logic must remain in the single backend/main.mo actor file.",
+    "Immutable frontend paths (useInternetIdentity, useActor, main.tsx, components/ui) must not be modified."
   ],
   "nonGoals": [
-    "Adding new backend endpoints or changing the Motoko actor logic.",
-    "Implementing auto-expiry of pledges (deferred to a future request).",
-    "Changing the overall visual theme or layout of the dashboard."
+    "Changing the Internet Identity authentication flow.",
+    "Adding email-based login or external OAuth providers.",
+    "Modifying the existing project, task, or pledge lifecycle logic beyond what is required to enforce role constraints."
   ],
   "imageRequirements": {
     "required": [],

@@ -66,6 +66,8 @@ export interface UserProfile {
     totalEarnedHH: number;
     profilePicture: string;
     overallReputationScore: number;
+    participationLevel: ParticipationLevel;
+    participationLevelLocked: boolean;
 }
 export interface Project {
     id: bigint;
@@ -79,6 +81,12 @@ export interface Project {
     sharedResourceLink?: string;
     finalMonetaryValue: number;
     estimatedTotalHH: number;
+}
+export enum ParticipationLevel {
+    Journeyman = "Journeyman",
+    GuestArtist = "GuestArtist",
+    Apprentice = "Apprentice",
+    Master = "Master"
 }
 export enum PledgeStatus {
     expired = "expired",
@@ -145,7 +153,9 @@ export interface backendInterface {
     pledgeToTask(projectId: bigint, target: PledgeTarget, amount: number): Promise<void>;
     ratePeer(ratee: Principal, projectId: bigint, rating: number): Promise<void>;
     reassignFromOtherTasks(pledgeId: bigint, newTaskId: bigint): Promise<void>;
-    registerUser(username: string, role: SquadRole): Promise<void>;
+    registerUser(username: string, role: SquadRole, participationLevel: ParticipationLevel): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    setParticipationLevel(level: ParticipationLevel): Promise<void>;
+    updateParticipationLevel(user: Principal, level: ParticipationLevel): Promise<void>;
     vote(targetId: bigint, voteType: Variant_finalPrize_challenge_taskProposal): Promise<void>;
 }

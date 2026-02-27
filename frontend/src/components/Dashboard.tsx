@@ -3,9 +3,24 @@ import { useGetCallerUserProfile, useGetProjects } from '../hooks/useQueries';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Zap, Star, Award } from 'lucide-react';
+import { Zap, Star, Award, Shield } from 'lucide-react';
 import ProjectsTab from './ProjectsTab';
 import CreateProjectDialog from './CreateProjectDialog';
+import { ParticipationLevel } from '../backend';
+
+const PARTICIPATION_LEVEL_LABELS: Record<ParticipationLevel, string> = {
+  [ParticipationLevel.Apprentice]: 'Apprentice',
+  [ParticipationLevel.Journeyman]: 'Journeyman',
+  [ParticipationLevel.Master]: 'Master',
+  [ParticipationLevel.GuestArtist]: 'Guest Artist',
+};
+
+const PARTICIPATION_LEVEL_COLORS: Record<ParticipationLevel, string> = {
+  [ParticipationLevel.Apprentice]: 'text-blue-600 dark:text-blue-400',
+  [ParticipationLevel.Journeyman]: 'text-green-600 dark:text-green-400',
+  [ParticipationLevel.Master]: 'text-purple-600 dark:text-purple-400',
+  [ParticipationLevel.GuestArtist]: 'text-amber-600 dark:text-amber-400',
+};
 
 export default function Dashboard() {
   const { data: userProfile } = useGetCallerUserProfile();
@@ -16,10 +31,38 @@ export default function Dashboard() {
   const activeProjects = projects.filter((p) => p.status === 'active');
   const completedProjects = projects.filter((p) => p.status === 'completed');
 
+  const participationLevelLabel = userProfile?.participationLevel
+    ? PARTICIPATION_LEVEL_LABELS[userProfile.participationLevel] ?? String(userProfile.participationLevel)
+    : null;
+
+  const participationLevelColor = userProfile?.participationLevel
+    ? PARTICIPATION_LEVEL_COLORS[userProfile.participationLevel] ?? 'text-foreground'
+    : 'text-foreground';
+
   return (
     <div className="container py-8">
-      {/* Three Scorecards */}
-      <div className="mb-8 grid gap-4 md:grid-cols-3">
+      {/* Four Scorecards */}
+      <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Participation Level & Voting Power */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Participation Level</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${participationLevelColor}`}>
+              {participationLevelLabel || '—'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Voting Power:{' '}
+              <span className="font-semibold text-foreground">
+                {userProfile?.votingPower.toFixed(1) ?? '0.0'}
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Earned HH */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">My Earned HH</CardTitle>
@@ -31,6 +74,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Reputation */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">My Reputation</CardTitle>
@@ -38,21 +82,22 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {userProfile?.overallReputationScore.toFixed(2) || '3.00'} ★
+              {userProfile?.overallReputationScore.toFixed(2) || '0.00'} ★
             </div>
-            <p className="text-xs text-muted-foreground">
-              Voting Power: {userProfile?.votingPower.toFixed(2) || '9.00'}
-            </p>
+            <p className="text-xs text-muted-foreground">Peer-weighted score</p>
           </CardContent>
         </Card>
 
+        {/* Enabler Points */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">My Enabler Points</CardTitle>
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">
+              {userProfile ? Number(userProfile.totalEnablerPoints) : 0}
+            </div>
             <p className="text-xs text-muted-foreground">C-Score (Coming Soon)</p>
           </CardContent>
         </Card>

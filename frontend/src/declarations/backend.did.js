@@ -19,6 +19,12 @@ export const SquadRole = IDL.Variant({
   'Apprentice' : IDL.Null,
   'Masters' : IDL.Null,
 });
+export const ParticipationLevel = IDL.Variant({
+  'Journeyman' : IDL.Null,
+  'GuestArtist' : IDL.Null,
+  'Apprentice' : IDL.Null,
+  'Master' : IDL.Null,
+});
 export const UserProfile = IDL.Record({
   'totalPledgedHH' : IDL.Float64,
   'votingPower' : IDL.Float64,
@@ -30,6 +36,8 @@ export const UserProfile = IDL.Record({
   'totalEarnedHH' : IDL.Float64,
   'profilePicture' : IDL.Text,
   'overallReputationScore' : IDL.Float64,
+  'participationLevel' : ParticipationLevel,
+  'participationLevelLocked' : IDL.Bool,
 });
 export const Time = IDL.Int;
 export const Challenge = IDL.Record({
@@ -162,8 +170,14 @@ export const idlService = IDL.Service({
   'pledgeToTask' : IDL.Func([IDL.Nat, PledgeTarget, IDL.Float64], [], []),
   'ratePeer' : IDL.Func([IDL.Principal, IDL.Nat, IDL.Float64], [], []),
   'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
-  'registerUser' : IDL.Func([IDL.Text, SquadRole], [], []),
+  'registerUser' : IDL.Func([IDL.Text, SquadRole, ParticipationLevel], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'setParticipationLevel' : IDL.Func([ParticipationLevel], [], []),
+  'updateParticipationLevel' : IDL.Func(
+      [IDL.Principal, ParticipationLevel],
+      [],
+      [],
+    ),
   'vote' : IDL.Func(
       [
         IDL.Nat,
@@ -192,6 +206,12 @@ export const idlFactory = ({ IDL }) => {
     'Apprentice' : IDL.Null,
     'Masters' : IDL.Null,
   });
+  const ParticipationLevel = IDL.Variant({
+    'Journeyman' : IDL.Null,
+    'GuestArtist' : IDL.Null,
+    'Apprentice' : IDL.Null,
+    'Master' : IDL.Null,
+  });
   const UserProfile = IDL.Record({
     'totalPledgedHH' : IDL.Float64,
     'votingPower' : IDL.Float64,
@@ -203,6 +223,8 @@ export const idlFactory = ({ IDL }) => {
     'totalEarnedHH' : IDL.Float64,
     'profilePicture' : IDL.Text,
     'overallReputationScore' : IDL.Float64,
+    'participationLevel' : ParticipationLevel,
+    'participationLevelLocked' : IDL.Bool,
   });
   const Time = IDL.Int;
   const Challenge = IDL.Record({
@@ -335,8 +357,18 @@ export const idlFactory = ({ IDL }) => {
     'pledgeToTask' : IDL.Func([IDL.Nat, PledgeTarget, IDL.Float64], [], []),
     'ratePeer' : IDL.Func([IDL.Principal, IDL.Nat, IDL.Float64], [], []),
     'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
-    'registerUser' : IDL.Func([IDL.Text, SquadRole], [], []),
+    'registerUser' : IDL.Func(
+        [IDL.Text, SquadRole, ParticipationLevel],
+        [],
+        [],
+      ),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'setParticipationLevel' : IDL.Func([ParticipationLevel], [], []),
+    'updateParticipationLevel' : IDL.Func(
+        [IDL.Principal, ParticipationLevel],
+        [],
+        [],
+      ),
     'vote' : IDL.Func(
         [
           IDL.Nat,

@@ -6,6 +6,7 @@ import ProfileSetupModal from './ProfileSetupModal';
 import Dashboard from './Dashboard';
 import Header from './Header';
 import Footer from './Footer';
+import AdminPanel from './AdminPanel';
 
 export default function MainApp() {
   const { identity, isInitializing } = useInternetIdentity();
@@ -48,6 +49,7 @@ export default function MainApp() {
       <Header />
       <main className="flex-1">
         <Dashboard />
+        <AdminPanel />
       </main>
       <Footer />
       {showProfileSetup && <ProfileSetupModal />}

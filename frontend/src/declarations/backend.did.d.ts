@@ -16,6 +16,10 @@ export interface Challenge {
   'timestamp' : Time,
   'challenger' : Principal,
 }
+export type ParticipationLevel = { 'Journeyman' : null } |
+  { 'GuestArtist' : null } |
+  { 'Apprentice' : null } |
+  { 'Master' : null };
 export interface PeerRating {
   'projectId' : bigint,
   'timestamp' : Time,
@@ -91,6 +95,8 @@ export interface UserProfile {
   'totalEarnedHH' : number,
   'profilePicture' : string,
   'overallReputationScore' : number,
+  'participationLevel' : ParticipationLevel,
+  'participationLevelLocked' : boolean,
 }
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
@@ -136,8 +142,16 @@ export interface _SERVICE {
   'pledgeToTask' : ActorMethod<[bigint, PledgeTarget, number], undefined>,
   'ratePeer' : ActorMethod<[Principal, bigint, number], undefined>,
   'reassignFromOtherTasks' : ActorMethod<[bigint, bigint], undefined>,
-  'registerUser' : ActorMethod<[string, SquadRole], undefined>,
+  'registerUser' : ActorMethod<
+    [string, SquadRole, ParticipationLevel],
+    undefined
+  >,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'setParticipationLevel' : ActorMethod<[ParticipationLevel], undefined>,
+  'updateParticipationLevel' : ActorMethod<
+    [Principal, ParticipationLevel],
+    undefined
+  >,
   'vote' : ActorMethod<
     [
       bigint,

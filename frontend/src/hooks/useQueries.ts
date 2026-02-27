@@ -8,6 +8,7 @@ import type {
   PledgeTarget,
   SquadRole,
   PeerRating,
+  ParticipationLevel,
 } from "../backend";
 import { PledgeStatus } from "../backend";
 import type { Principal } from "@icp-sdk/core/principal";
@@ -69,12 +70,14 @@ export function useRegisterUser() {
     mutationFn: async ({
       username,
       role,
+      participationLevel,
     }: {
       username: string;
       role: SquadRole;
+      participationLevel: ParticipationLevel;
     }) => {
       if (!actor) throw new Error("Actor not available");
-      return actor.registerUser(username, role);
+      return actor.registerUser(username, role, participationLevel);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
@@ -403,6 +406,43 @@ export function useReassignFromOtherTasks() {
         queryKey: ["pledges", variables.projectId.toString()],
       });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
+export function useIsCallerAdmin() {
+  const { actor, isFetching: actorFetching } = useActor();
+
+  return useQuery<boolean>({
+    queryKey: ["isCallerAdmin"],
+    queryFn: async () => {
+      if (!actor) return false;
+      return actor.isCallerAdmin();
+    },
+    enabled: !!actor && !actorFetching,
+    retry: false,
+  });
+}
+
+export function useUpdateParticipationLevel() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      user,
+      level,
+    }: {
+      user: Principal;
+      level: ParticipationLevel;
+    }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.updateParticipationLevel(user, level);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["userProfile", variables.user.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["allUsersForAdmin"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
     },
   });
 }

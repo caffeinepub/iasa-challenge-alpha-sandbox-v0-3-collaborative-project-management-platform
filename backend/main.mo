@@ -8,13 +8,10 @@ import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
 
-
-
+import Migration "migration";
+(with migration = Migration.run)
 actor IASAChallenge {
   let accessControlState = AccessControl.initState();
-
-  // Heartbeat timer (every 24 hours)
-  transient let dayInNanos : Int = 24 * 60 * 60 * 1_000_000_000;
 
   public shared ({ caller }) func initializeAccessControl() : async () {
     AccessControl.initialize(accessControlState, caller);
@@ -39,6 +36,66 @@ actor IASAChallenge {
     #Masters;
   };
 
+  public type ParticipationLevel = {
+    #Apprentice;
+    #Journeyman;
+    #Master;
+    #GuestArtist;
+  };
+
+  func participationLevelToVotingPower(level : ParticipationLevel) : Float {
+    switch (level) {
+      case (#Apprentice) { 0.0 };
+      case (#Journeyman) { 1.0 };
+      case (#Master) { 3.0 };
+      case (#GuestArtist) { 4.0 };
+    };
+  };
+
+  // Enforce role-participation level constraints:
+  // PM (Masters) -> only Journeyman or Master
+  // Mentor -> only Master or GuestArtist
+  // Team Player (Journeyman/Apprentice) -> Apprentice, Journeyman, or Master
+  // Administrator role is handled by AccessControl
+  func isRoleCompatibleWithLevel(role : SquadRole, level : ParticipationLevel) : Bool {
+    switch (role) {
+      case (#Masters) {
+        // PM role: only Journeyman or Master participation level
+        switch (level) {
+          case (#Journeyman) { true };
+          case (#Master) { true };
+          case (_) { false };
+        };
+      };
+      case (#Mentor) {
+        // Mentor/Product Owner role: only Master or GuestArtist participation level
+        switch (level) {
+          case (#Master) { true };
+          case (#GuestArtist) { true };
+          case (_) { false };
+        };
+      };
+      case (#Journeyman) {
+        // Team Player (Journeyman): Apprentice, Journeyman, or Master
+        switch (level) {
+          case (#Apprentice) { true };
+          case (#Journeyman) { true };
+          case (#Master) { true };
+          case (#GuestArtist) { false };
+        };
+      };
+      case (#Apprentice) {
+        // Team Player (Apprentice): Apprentice, Journeyman, or Master
+        switch (level) {
+          case (#Apprentice) { true };
+          case (#Journeyman) { true };
+          case (#Master) { true };
+          case (#GuestArtist) { false };
+        };
+      };
+    };
+  };
+
   public type UserProfile = {
     friendlyUsername : Text;
     profilePicture : Text;
@@ -50,6 +107,9 @@ actor IASAChallenge {
     totalEnablerPoints : Nat;
     efficiencyBadgesCount : Nat;
     constructivenessRating : Float;
+    participationLevel : ParticipationLevel;
+    // Track whether participation level has been set (locked after initial selection)
+    participationLevelLocked : Bool;
   };
 
   public type ProjectStatus = {
@@ -167,8 +227,9 @@ actor IASAChallenge {
     switch (natMap.get(projects, projectId)) {
       case null { false };
       case (?project) {
-        if (project.creator == user) { return true };
-        Array.find<Principal>(project.participants, func(p) { p == user }) != null;
+        if (project.creator == user) { true } else {
+          Array.find<Principal>(project.participants, func(p) { p == user }) != null;
+        };
       };
     };
   };
@@ -177,9 +238,7 @@ actor IASAChallenge {
     let allVotes = Iter.toArray(natMap.vals(votes));
     Array.find<Vote>(
       allVotes,
-      func(v) {
-        v.voter == voter and v.targetId == targetId and v.voteType == voteType;
-      },
+      func(v) { v.voter == voter and v.targetId == targetId and v.voteType == voteType },
     ) != null;
   };
 
@@ -189,11 +248,7 @@ actor IASAChallenge {
       projectTasks,
       0.0,
       func(acc, task) {
-        if (task.projectId == projectId) {
-          acc + task.hhBudget;
-        } else {
-          acc;
-        };
+        if (task.projectId == projectId) { acc + task.hhBudget } else { acc };
       },
     );
   };
@@ -210,7 +265,7 @@ actor IASAChallenge {
     Array.find<PeerRating>(
       allRatings,
       func(r) {
-        r.rater == rater and r.ratee == ratee and r.projectId == projectId;
+        r.rater == rater and r.ratee == ratee and r.projectId == projectId
       },
     ) != null;
   };
@@ -229,7 +284,7 @@ actor IASAChallenge {
     Array.find<Pledge>(
       allPledges,
       func(p) {
-        p.user == user and p.projectId == projectId and (p.status == #confirmed or p.status == #approved or p.status == #pending or p.status == #reassigned);
+        p.user == user and p.projectId == projectId and (p.status == #confirmed or p.status == #approved or p.status == #pending or p.status == #reassigned)
       },
     ) != null;
   };
@@ -266,31 +321,132 @@ actor IASAChallenge {
     principalMap.get(userProfiles, user);
   };
 
+  // saveCallerUserProfile: users may update their own profile metadata,
+  // but participationLevel and participationLevelLocked are protected fields:
+  // - participationLevel can only be changed by admin (via updateParticipationLevel)
+  // - squadRole constraints are enforced against the current participation level
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Debug.trap("Unauthorized: Only users can save profiles");
     };
-    userProfiles := principalMap.put(userProfiles, caller, profile);
+
+    switch (principalMap.get(userProfiles, caller)) {
+      case null {
+        // No existing profile: treat as initial registration, enforce constraints
+        if (not isRoleCompatibleWithLevel(profile.squadRole, profile.participationLevel)) {
+          Debug.trap("Invalid: Squad role is not compatible with the selected participation level");
+        };
+        // Set votingPower based on participation level
+        let newProfile = {
+          profile with
+          votingPower = participationLevelToVotingPower(profile.participationLevel);
+          participationLevelLocked = true;
+        };
+        userProfiles := principalMap.put(userProfiles, caller, newProfile);
+      };
+      case (?existing) {
+        // Existing profile: participation level and lock status cannot be changed by the user
+        if (profile.participationLevel != existing.participationLevel) {
+          Debug.trap("Unauthorized: Participation level is locked and can only be changed by the administrator");
+        };
+        // Enforce role-level compatibility with the locked participation level
+        if (not isRoleCompatibleWithLevel(profile.squadRole, existing.participationLevel)) {
+          Debug.trap("Invalid: Squad role is not compatible with your participation level");
+        };
+        // Preserve locked fields: participationLevel, participationLevelLocked, votingPower
+        let updatedProfile = {
+          profile with
+          participationLevel = existing.participationLevel;
+          participationLevelLocked = existing.participationLevelLocked;
+          votingPower = existing.votingPower;
+        };
+        userProfiles := principalMap.put(userProfiles, caller, updatedProfile);
+      };
+    };
   };
 
-  public shared ({ caller }) func registerUser(username : Text, role : SquadRole) : async () {
+  // setParticipationLevel: allows a user to self-select their participation level ONCE.
+  // After the initial selection (participationLevelLocked = true), only admin can change it.
+  public shared ({ caller }) func setParticipationLevel(level : ParticipationLevel) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only users can set their participation level");
+    };
+
+    switch (principalMap.get(userProfiles, caller)) {
+      case null {
+        Debug.trap("User profile not found: please register first");
+      };
+      case (?profile) {
+        if (profile.participationLevelLocked) {
+          Debug.trap("Unauthorized: Participation level is already set and locked. Only the administrator can change it.");
+        };
+        // Enforce role-level compatibility
+        if (not isRoleCompatibleWithLevel(profile.squadRole, level)) {
+          Debug.trap("Invalid: Selected participation level is not compatible with your current squad role");
+        };
+        let updatedProfile = {
+          profile with
+          participationLevel = level;
+          votingPower = participationLevelToVotingPower(level);
+          participationLevelLocked = true;
+        };
+        userProfiles := principalMap.put(userProfiles, caller, updatedProfile);
+      };
+    };
+  };
+
+  // updateParticipationLevel: admin-only function to change a user's participation level after it is locked.
+  public shared ({ caller }) func updateParticipationLevel(user : Principal, level : ParticipationLevel) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Debug.trap("Unauthorized: Only admin can update participation levels");
+    };
+
+    switch (principalMap.get(userProfiles, user)) {
+      case null { Debug.trap("User profile not found") };
+      case (?profile) {
+        // Enforce role-level compatibility after admin changes the level
+        if (not isRoleCompatibleWithLevel(profile.squadRole, level)) {
+          Debug.trap("Invalid: The new participation level is not compatible with the user's current squad role");
+        };
+        let updatedProfile = {
+          profile with
+          participationLevel = level;
+          votingPower = participationLevelToVotingPower(level);
+          participationLevelLocked = true;
+        };
+        userProfiles := principalMap.put(userProfiles, user, updatedProfile);
+      };
+    };
+  };
+
+  // registerUser: initial profile creation with participation level self-selection.
+  // The participation level is locked after registration.
+  // Role-participation level constraints are enforced.
+  public shared ({ caller }) func registerUser(username : Text, role : SquadRole, participationLevel : ParticipationLevel) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Debug.trap("Unauthorized: Only users can register a profile");
     };
     switch (principalMap.get(userProfiles, caller)) {
       case (?_) { Debug.trap("User already registered") };
       case null {
+        // Enforce role-participation level constraints
+        if (not isRoleCompatibleWithLevel(role, participationLevel)) {
+          Debug.trap("Invalid: The selected squad role is not compatible with the selected participation level");
+        };
         let newProfile : UserProfile = {
           friendlyUsername = username;
           profilePicture = "";
           totalPledgedHH = 0.0;
           totalEarnedHH = 0.0;
           overallReputationScore = 0.0;
-          votingPower = 0.0;
+          votingPower = participationLevelToVotingPower(participationLevel);
           squadRole = role;
           totalEnablerPoints = 0;
           efficiencyBadgesCount = 0;
           constructivenessRating = 0.0;
+          participationLevel;
+          // Lock the participation level after initial selection
+          participationLevelLocked = true;
         };
         userProfiles := principalMap.put(userProfiles, caller, newProfile);
       };
@@ -1216,3 +1372,4 @@ actor IASAChallenge {
     };
   };
 };
+

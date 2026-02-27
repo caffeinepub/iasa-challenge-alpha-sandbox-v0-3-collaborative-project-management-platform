@@ -1,65 +1,94 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-27T20:55:02.718Z",
+  "generatedAt": "2026-02-27T22:30:34.169Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
+    "total": 6,
     "implemented": 3,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Fix the ProjectDetailsDialog (draft view) so that it opens correctly when triggered from a ProjectCard. Investigate and resolve any rendering or state error that prevents the dialog from mounting in the current deployment.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/ProjectDetailsDialog.tsx",
-          "frontend/src/components/ProjectCard.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/ProjectDetailsDialog.tsx"
-        ]
+        "summary": "Define four participation levels in the backend data model: Apprentice (student/young professional), Journeyman (project leader), Master (senior professional), and Guest Artist (external professional). Each level must carry an initial voting power: Apprentice = 0, Journeyman = 1, Master = 3, Guest Artist = 4.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "In the Tasks section and TaskCard components, clearly display the sequential lifecycle conditions for a task: (1) Task is created by PM in 'open' state; (2) A participant pledges HH hours to the task (pledge status = 'pending'); (3) PM confirms the pledge (pledge status = 'confirmed'); (4) Once the task has sufficient confirmed pledges, the PM can set the task to 'inProgress'; (5) The assignee marks the task as 'completed'; (6) PM approves the task completion (task status = 'approved'). Each state transition should be visually distinct with a status badge or label.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/components/TaskCard.tsx",
-          "frontend/src/components/TasksSection.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/components/TaskCard.tsx",
-          "frontend/src/components/TasksSection.tsx"
-        ]
+        "summary": "Allow a participant to self-select their participation level once during profile setup. After the initial selection, the level must be locked and can only be modified by the Administrator (principal associated with jv@grupoiasa.cl).",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
       },
       {
         "id": "REQ-3",
-        "summary": "In the PledgeSection component, clearly display the sequential lifecycle conditions for a pledge: (1) Participant submits a pledge (status = 'pending', not counted in confirmed budget); (2) PM reviews and confirms the pledge (status = 'confirmed', now counted in HH budget and Share of Pool); (3) If not confirmed within the expiry window, pledge becomes 'expired'. Show each pledge with its current status and indicate what action is needed next (e.g., 'Awaiting PM confirmation').",
+        "summary": "Enforce role assignment constraints in the backend: Project Manager (PM) role may only be assigned to Journeyman or Master participants; Mentor/Product Owner role may only be assigned to Master or Guest Artist participants; Team Player role is open to Apprentice, Journeyman, or Master; Administrator role is reserved for jv@grupoiasa.cl.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Update the ProfileSetupModal to include a participation level selector (Apprentice, Journeyman, Master, Guest Artist) with concise descriptions for each. The selected level must be submitted to the backend during profile registration.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/PledgeSection.tsx",
-          "frontend/src/components/ShareOfPoolSection.tsx"
+          "frontend/src/components/ProfileSetupModal.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/PledgeSection.tsx",
-          "frontend/src/components/ShareOfPoolSection.tsx"
+          "frontend/src/components/ProfileSetupModal.tsx"
+        ]
+      },
+      {
+        "id": "REQ-5",
+        "summary": "Display the participant's participation level (e.g., 'Apprentice', 'Journeyman', 'Master', 'Guest Artist') and their derived voting power in the Header user dropdown and in the Dashboard scorecard, replacing or supplementing any previously generic role/voting-power display.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/Header.tsx",
+          "frontend/src/components/Dashboard.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/Header.tsx",
+          "frontend/src/components/Dashboard.tsx"
+        ]
+      },
+      {
+        "id": "REQ-6",
+        "summary": "Provide an Administrator-only UI panel (accessible only when logged in as the Administrator principal jv@grupoiasa.cl) that allows changing any participant's participation level. This panel must not be visible or accessible to non-admin users.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/AdminPanel.tsx",
+          "frontend/src/components/MainApp.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/AdminPanel.tsx",
+          "frontend/src/components/MainApp.tsx",
+          "frontend/src/hooks/useQueries.ts"
         ]
       }
     ]
   },
   "changedFiles": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/components/PledgeSection.tsx",
-    "frontend/src/components/ProjectDetailsDialog.tsx",
-    "frontend/src/components/ShareOfPoolSection.tsx",
-    "frontend/src/components/TaskCard.tsx",
-    "frontend/src/components/TasksSection.tsx",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
+    "frontend/src/components/AdminPanel.tsx",
+    "frontend/src/components/Dashboard.tsx",
+    "frontend/src/components/Header.tsx",
+    "frontend/src/components/MainApp.tsx",
+    "frontend/src/components/ProfileSetupModal.tsx",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
+    "frontend/src/hooks/useQueries.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",
