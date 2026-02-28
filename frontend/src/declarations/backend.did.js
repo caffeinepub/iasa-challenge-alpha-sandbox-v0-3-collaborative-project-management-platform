@@ -124,6 +124,15 @@ export const Vote = IDL.Record({
   'timestamp' : Time,
   'targetId' : IDL.Nat,
 });
+export const ApprovalStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const UserApprovalInfo = IDL.Record({
+  'status' : ApprovalStatus,
+  'principal' : IDL.Principal,
+});
 
 export const idlService = IDL.Service({
   'acceptTask' : IDL.Func([IDL.Nat], [], []),
@@ -167,11 +176,15 @@ export const idlService = IDL.Service({
   'getVotes' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
   'initializeAccessControl' : IDL.Func([], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
+  'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'pledgeToTask' : IDL.Func([IDL.Nat, PledgeTarget, IDL.Float64], [], []),
   'ratePeer' : IDL.Func([IDL.Principal, IDL.Nat, IDL.Float64], [], []),
   'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
   'registerUser' : IDL.Func([IDL.Text, SquadRole, ParticipationLevel], [], []),
+  'requestApproval' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
   'setParticipationLevel' : IDL.Func([ParticipationLevel], [], []),
   'updateParticipationLevel' : IDL.Func(
       [IDL.Principal, ParticipationLevel],
@@ -311,6 +324,15 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : Time,
     'targetId' : IDL.Nat,
   });
+  const ApprovalStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const UserApprovalInfo = IDL.Record({
+    'status' : ApprovalStatus,
+    'principal' : IDL.Principal,
+  });
   
   return IDL.Service({
     'acceptTask' : IDL.Func([IDL.Nat], [], []),
@@ -354,6 +376,8 @@ export const idlFactory = ({ IDL }) => {
     'getVotes' : IDL.Func([IDL.Nat], [IDL.Vec(Vote)], ['query']),
     'initializeAccessControl' : IDL.Func([], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
+    'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'pledgeToTask' : IDL.Func([IDL.Nat, PledgeTarget, IDL.Float64], [], []),
     'ratePeer' : IDL.Func([IDL.Principal, IDL.Nat, IDL.Float64], [], []),
     'reassignFromOtherTasks' : IDL.Func([IDL.Nat, IDL.Nat], [], []),
@@ -362,7 +386,9 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'requestApproval' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
     'setParticipationLevel' : IDL.Func([ParticipationLevel], [], []),
     'updateParticipationLevel' : IDL.Func(
         [IDL.Principal, ParticipationLevel],

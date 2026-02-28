@@ -1,4 +1,5 @@
 import AccessControl "authorization/access-control";
+import UserApproval "user-approval/approval";
 import Principal "mo:base/Principal";
 import OrderedMap "mo:base/OrderedMap";
 import Iter "mo:base/Iter";
@@ -8,10 +9,10 @@ import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
 
-import Migration "migration";
-(with migration = Migration.run)
 actor IASAChallenge {
   let accessControlState = AccessControl.initState();
+
+  let approvalState = UserApproval.initState(accessControlState);
 
   public shared ({ caller }) func initializeAccessControl() : async () {
     AccessControl.initialize(accessControlState, caller);
@@ -22,11 +23,41 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func assignCallerUserRole(user : Principal, role : AccessControl.UserRole) : async () {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Debug.trap("Unauthorized: Only the administrator can assign roles");
+    };
     AccessControl.assignRole(accessControlState, caller, user, role);
   };
 
   public query ({ caller }) func isCallerAdmin() : async Bool {
     AccessControl.isAdmin(accessControlState, caller);
+  };
+
+  public shared ({ caller }) func requestApproval() : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Debug.trap("Unauthorized: Only registered users can request approval");
+    };
+    UserApproval.requestApproval(approvalState, caller);
+  };
+
+  public query ({ caller }) func isCallerApproved() : async Bool {
+    UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin);
+  };
+
+  public shared ({ caller }) func setApproval(user : Principal, status : UserApproval.ApprovalStatus) : async () {
+    // Admin-only - Only admin can approve users (does not include self-approval)
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Debug.trap("Unauthorized: Only the administrator can accept/approve users");
+    };
+    UserApproval.setApproval(approvalState, user, status);
+  };
+
+  public query ({ caller }) func listApprovals() : async [UserApproval.UserApprovalInfo] {
+    // Admin-only
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Debug.trap("Unauthorized: Only the administrator can view approval status");
+    };
+    UserApproval.listApprovals(approvalState);
   };
 
   public type SquadRole = {
@@ -255,7 +286,7 @@ actor IASAChallenge {
 
   private func getTotalAssignedHH(projectId : Nat) : Float {
     let projectPledges = Iter.toArray(natMap.vals(pledges));
-    // Only count pledged HH that are in the `confirmed` or `approved` states - never count `pending`
+    // Only count pledged HH that are in the \`confirmed\` or \`approved\` states - never count \`pending\`
     let confirmedPledges = Array.filter<Pledge>(projectPledges, func(p) { p.projectId == projectId and (p.status == #confirmed or p.status == #approved) });
     Array.foldLeft<Pledge, Float>(confirmedPledges, 0.0, func(acc, pledge) { acc + pledge.amount });
   };
@@ -307,16 +338,32 @@ actor IASAChallenge {
 
   // Profile functions
 
+  // getCallerUserProfile: any authenticated (non-anonymous) user can read their own profile.
+  // This allows non-approved users to check their own profile/status after login without
+  // triggering a connection error.
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can access profiles");
+      Debug.trap("Unauthorized: Only authenticated users can access their profile");
     };
     principalMap.get(userProfiles, caller);
   };
 
+  // getUserProfile: a user can always view their own profile; admins can view any profile;
+  // approved users can view other users' profiles.
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Debug.trap("Unauthorized: Can only view your own profile");
+    if (caller == user) {
+      // Any authenticated user can view their own profile
+      if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+        Debug.trap("Unauthorized: Only authenticated users can view profiles");
+      };
+    } else {
+      // Viewing another user's profile requires approval or admin
+      if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+        Debug.trap("Unauthorized: Only approved users can view other users' profiles");
+      };
+      if (not AccessControl.isAdmin(accessControlState, caller)) {
+        Debug.trap("Unauthorized: Can only view your own profile");
+      };
     };
     principalMap.get(userProfiles, user);
   };
@@ -326,8 +373,9 @@ actor IASAChallenge {
   // - participationLevel can only be changed by admin (via updateParticipationLevel)
   // - squadRole constraints are enforced against the current participation level
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can save profiles");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can save profiles");
     };
 
     switch (principalMap.get(userProfiles, caller)) {
@@ -368,8 +416,9 @@ actor IASAChallenge {
   // setParticipationLevel: allows a user to self-select their participation level ONCE.
   // After the initial selection (participationLevelLocked = true), only admin can change it.
   public shared ({ caller }) func setParticipationLevel(level : ParticipationLevel) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can set their participation level");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can set their participation level");
     };
 
     switch (principalMap.get(userProfiles, caller)) {
@@ -397,8 +446,9 @@ actor IASAChallenge {
 
   // updateParticipationLevel: admin-only function to change a user's participation level after it is locked.
   public shared ({ caller }) func updateParticipationLevel(user : Principal, level : ParticipationLevel) : async () {
+    // Admin-only
     if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Debug.trap("Unauthorized: Only admin can update participation levels");
+      Debug.trap("Unauthorized: Only the administrator can update participation levels");
     };
 
     switch (principalMap.get(userProfiles, user)) {
@@ -423,8 +473,9 @@ actor IASAChallenge {
   // The participation level is locked after registration.
   // Role-participation level constraints are enforced.
   public shared ({ caller }) func registerUser(username : Text, role : SquadRole, participationLevel : ParticipationLevel) : async () {
+    // Any registered/authenticated user can register a profile - but must be approved by admin to obtain full access
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can register a profile");
+      Debug.trap("Unauthorized: Only registered/authenticated users can create a profile");
     };
     switch (principalMap.get(userProfiles, caller)) {
       case (?_) { Debug.trap("User already registered") };
@@ -455,10 +506,10 @@ actor IASAChallenge {
 
   // Project functions
 
-  // Any signed-in participant (registered user) may create a project.
   public shared ({ caller }) func createProject(title : Text, description : Text, estimatedTotalHH : Float, finalMonetaryValue : Float, sharedResourceLink : ?Text, otherTasksPoolHH : Float) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in participants can create projects");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can create projects");
     };
 
     if (estimatedTotalHH <= 0.0) {
@@ -511,10 +562,10 @@ actor IASAChallenge {
     projectId;
   };
 
-  // Any signed-in participant may create tasks in a project that is in pledging or active phase.
   public shared ({ caller }) func createTask(projectId : Nat, title : Text, description : Text, hhBudget : Float, dependencies : [Nat]) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in participants can create tasks");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can create tasks");
     };
 
     switch (natMap.get(projects, projectId)) {
@@ -581,10 +632,10 @@ actor IASAChallenge {
 
   // Pledge functions
 
-  // Any signed-in participant may pledge HH to any project or task.
   public shared ({ caller }) func pledgeToTask(projectId : Nat, target : PledgeTarget, amount : Float) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in participants can pledge");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can pledge");
     };
 
     if (amount <= 0.0) {
@@ -682,7 +733,6 @@ actor IASAChallenge {
     };
   };
 
-  // Update ProjectStatus based on confirmed HH (not pending).
   func updateProjectStatus(projectId : Nat) : () {
     switch (natMap.get(projects, projectId)) {
       case null { };
@@ -710,10 +760,10 @@ actor IASAChallenge {
     };
   };
 
-  // Only the Project Manager (PM / creator) of a project may confirm tasks for HH.
   public shared ({ caller }) func confirmTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in users can confirm tasks");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can confirm tasks");
     };
 
     switch (natMap.get(tasks, taskId)) {
@@ -737,10 +787,10 @@ actor IASAChallenge {
     };
   };
 
-  // The PM may then confirm individual pledges once the task has been confirmed.
   public shared ({ caller }) func confirmPledge(pledgeId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in users can confirm pledges");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can confirm pledges");
     };
 
     switch (natMap.get(pledges, pledgeId)) {
@@ -789,10 +839,10 @@ actor IASAChallenge {
     };
   };
 
-  // Only the Project Manager (PM / creator) may reassign from Other Tasks pool.
   public shared ({ caller }) func reassignFromOtherTasks(pledgeId : Nat, newTaskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in users can reassign from Other Tasks pool");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can reassign from Other Tasks pool");
     };
 
     switch (natMap.get(pledges, pledgeId)) {
@@ -850,8 +900,9 @@ actor IASAChallenge {
   // Task lifecycle functions
 
   public shared ({ caller }) func acceptTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can accept tasks");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can accept tasks");
     };
 
     switch (natMap.get(tasks, taskId)) {
@@ -897,8 +948,9 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func completeTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can complete tasks");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can complete tasks");
     };
 
     switch (natMap.get(tasks, taskId)) {
@@ -931,8 +983,9 @@ actor IASAChallenge {
 
   // Only a Mentor who has already pledged HH to the specific project or task may approve (sign off) a task.
   public shared ({ caller }) func approveTask(taskId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in users can approve tasks");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can approve tasks");
     };
 
     switch (natMap.get(tasks, taskId)) {
@@ -1008,8 +1061,9 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func challengeTask(taskId : Nat, stakeHH : Float) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can challenge tasks");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can challenge tasks");
     };
 
     if (stakeHH < 1.0) {
@@ -1062,8 +1116,9 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func vote(targetId : Nat, voteType : { #taskProposal; #challenge; #finalPrize }) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can vote");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can vote");
     };
 
     let voterProfile = switch (principalMap.get(userProfiles, caller)) {
@@ -1133,8 +1188,9 @@ actor IASAChallenge {
   };
 
   public shared ({ caller }) func ratePeer(ratee : Principal, projectId : Nat, rating : Float) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can rate peers");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can rate peers");
     };
 
     if (caller == ratee) {
@@ -1252,8 +1308,9 @@ actor IASAChallenge {
 
   // Only the PM (project creator) may mark a project as completed.
   public shared ({ caller }) func completeProject(projectId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only signed-in users can complete projects");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can complete projects");
     };
 
     switch (natMap.get(projects, projectId)) {
@@ -1283,15 +1340,17 @@ actor IASAChallenge {
   // Query functions
 
   public query ({ caller }) func getProjects() : async [Project] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view projects");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can view projects");
     };
     Iter.toArray(natMap.vals(projects));
   };
 
   public query ({ caller }) func getTasks(projectId : Nat) : async [Task] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view tasks");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can view tasks");
     };
 
     let allTasks = Iter.toArray(natMap.vals(tasks));
@@ -1299,8 +1358,9 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getPledges(projectId : Nat) : async [Pledge] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view pledges");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can view pledges");
     };
 
     let allPledges = Iter.toArray(natMap.vals(pledges));
@@ -1314,8 +1374,9 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getVotes(targetId : Nat) : async [Vote] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view votes");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can view votes");
     };
 
     let allVotes = Iter.toArray(natMap.vals(votes));
@@ -1323,8 +1384,9 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getPeerRatings(projectId : Nat) : async [PeerRating] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view peer ratings");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can view peer ratings");
     };
 
     let allRatings = Iter.toArray(natMap.vals(peerRatings));
@@ -1338,19 +1400,19 @@ actor IASAChallenge {
   };
 
   public query ({ caller }) func getChallenges(taskId : Nat) : async [Challenge] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Debug.trap("Unauthorized: Only users can view challenges");
+    // Approved users + admin only
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.isAdmin(accessControlState, caller))) {
+      Debug.trap("Unauthorized: Only approved users can view challenges");
     };
 
     let allChallenges = Iter.toArray(natMap.vals(challenges));
     Array.filter<Challenge>(allChallenges, func(challenge) { challenge.taskId == taskId });
   };
 
-  // Public function to trigger expiration check.
-  // Only admins may trigger this maintenance operation to prevent abuse.
   public shared ({ caller }) func checkAndExpireOldPledges() : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Debug.trap("Unauthorized: Only admins can trigger pledge expiration");
+    // Admin-only
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Debug.trap("Unauthorized: Only the administrator can trigger pledge expiration");
     };
 
     let currentTime = Time.now();
@@ -1372,4 +1434,3 @@ actor IASAChallenge {
     };
   };
 };
-

@@ -10,6 +10,9 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export type ApprovalStatus = { 'pending' : null } |
+  { 'approved' : null } |
+  { 'rejected' : null };
 export interface Challenge {
   'stakeHH' : number,
   'taskId' : bigint,
@@ -84,6 +87,10 @@ export type TaskStatus = { 'active' : null } |
   { 'pendingConfirmation' : null } |
   { 'inProgress' : null };
 export type Time = bigint;
+export interface UserApprovalInfo {
+  'status' : ApprovalStatus,
+  'principal' : Principal,
+}
 export interface UserProfile {
   'totalPledgedHH' : number,
   'votingPower' : number,
@@ -139,6 +146,8 @@ export interface _SERVICE {
   'getVotes' : ActorMethod<[bigint], Array<Vote>>,
   'initializeAccessControl' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'isCallerApproved' : ActorMethod<[], boolean>,
+  'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'pledgeToTask' : ActorMethod<[bigint, PledgeTarget, number], undefined>,
   'ratePeer' : ActorMethod<[Principal, bigint, number], undefined>,
   'reassignFromOtherTasks' : ActorMethod<[bigint, bigint], undefined>,
@@ -146,7 +155,9 @@ export interface _SERVICE {
     [string, SquadRole, ParticipationLevel],
     undefined
   >,
+  'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
   'setParticipationLevel' : ActorMethod<[ParticipationLevel], undefined>,
   'updateParticipationLevel' : ActorMethod<
     [Principal, ParticipationLevel],

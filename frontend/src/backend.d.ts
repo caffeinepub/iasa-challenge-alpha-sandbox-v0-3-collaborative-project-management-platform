@@ -40,6 +40,10 @@ export interface Challenge {
     timestamp: Time;
     challenger: Principal;
 }
+export interface UserApprovalInfo {
+    status: ApprovalStatus;
+    principal: Principal;
+}
 export interface Pledge {
     status: PledgeStatus;
     user: Principal;
@@ -81,6 +85,11 @@ export interface Project {
     sharedResourceLink?: string;
     finalMonetaryValue: number;
     estimatedTotalHH: number;
+}
+export enum ApprovalStatus {
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
 }
 export enum ParticipationLevel {
     Journeyman = "Journeyman",
@@ -150,11 +159,15 @@ export interface backendInterface {
     getVotes(targetId: bigint): Promise<Array<Vote>>;
     initializeAccessControl(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
+    isCallerApproved(): Promise<boolean>;
+    listApprovals(): Promise<Array<UserApprovalInfo>>;
     pledgeToTask(projectId: bigint, target: PledgeTarget, amount: number): Promise<void>;
     ratePeer(ratee: Principal, projectId: bigint, rating: number): Promise<void>;
     reassignFromOtherTasks(pledgeId: bigint, newTaskId: bigint): Promise<void>;
     registerUser(username: string, role: SquadRole, participationLevel: ParticipationLevel): Promise<void>;
+    requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     setParticipationLevel(level: ParticipationLevel): Promise<void>;
     updateParticipationLevel(user: Principal, level: ParticipationLevel): Promise<void>;
     vote(targetId: bigint, voteType: Variant_finalPrize_challenge_taskProposal): Promise<void>;

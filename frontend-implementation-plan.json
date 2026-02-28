@@ -1,71 +1,32 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Participation Levels, Voting Power, and Role Mapping - Frontend",
+  "title": "Fix external user (non-admin) login and connection issue",
   "requirements": [
     {
-      "id": "REQ-4",
-      "summary": "Add participation level selector to ProfileSetupModal with descriptions for Apprentice, Journeyman, Master, and Guest Artist",
+      "id": "REQ-1",
+      "summary": "Fix the authentication and connection flow so that external (non-admin) users can successfully log in and access the app via Internet Identity without encountering connection errors or blank screens",
       "acceptanceCriteria": [
-        "ProfileSetupModal presents all four participation levels with their descriptive subtitles.",
-        "A level must be selected before the form can be submitted.",
-        "The selected participationLevel is passed to the backend registration call.",
-        "After profile creation, the participation level field is read-only for non-admin users."
+        "A non-admin user (e.g. jedvogdt@gmail.com) can log in via Internet Identity without encountering a connection error or blank/stuck screen.",
+        "After login, a non-admin user is directed to the correct screen (pending approval UI, profile setup, or dashboard) depending on their approval status.",
+        "Admin login flow and admin panel access remain fully unchanged and functional.",
+        "No other existing app features or UI are modified."
       ],
       "file_operations": [
-        {
-          "path": "frontend/src/components/ProfileSetupModal.tsx",
-          "operation": "modify",
-          "description": "Replace the existing squad role selector with a participation level selector that displays all four levels (Apprentice, Journeyman, Master, Guest Artist) with concise descriptions. Update the form to pass the selected participationLevel to the backend registerUser call. Ensure the level selector is required before submission. The existing username field and modal structure remain intact."
-        }
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "summary": "Display participation level and derived voting power in Header dropdown and Dashboard scorecards",
-      "acceptanceCriteria": [
-        "Header dropdown shows the user's participation level label and their current voting power.",
-        "Dashboard scorecard reflects voting power derived from participation level.",
-        "Guest Artist participants show voting power of 4 in all relevant UI locations."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/Header.tsx",
-          "operation": "modify",
-          "description": "Update the user dropdown menu to display the participation level (e.g., 'Apprentice', 'Journeyman', 'Master', 'Guest Artist') alongside or replacing the current squad role display. Show the derived voting power value from the user profile. Ensure the display accurately reflects the backend-computed voting power based on participation level."
-        },
-        {
-          "path": "frontend/src/components/Dashboard.tsx",
-          "operation": "modify",
-          "description": "Update the scorecards section to display the user's participation level and derived voting power prominently. Replace or supplement the existing voting power display to show the level-based value (Apprentice→0, Journeyman→1, Master→3, GuestArtist→4). Ensure the scorecard layout remains responsive and consistent with the existing design."
-        }
-      ]
-    },
-    {
-      "id": "REQ-6",
-      "summary": "Create Administrator-only panel for changing participant participation levels",
-      "acceptanceCriteria": [
-        "Admin panel is only rendered when the authenticated principal matches the Administrator.",
-        "Admin panel lists all registered users with their current participation level.",
-        "Admin can change any user's participation level via a dropdown/select control.",
-        "On save, the backend updateParticipationLevel function is called and the UI reflects the updated level immediately.",
-        "No admin controls are visible to non-admin users."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/AdminPanel.tsx",
-          "operation": "create",
-          "description": "Create a new AdminPanel component that fetches and displays all registered users with their current participation levels. Include a dropdown/select control for each user to change their participation level. On save, call the backend updateParticipationLevel function and invalidate relevant queries to refresh the UI. The component must check the caller's admin status using the isCallerAdmin backend method and render nothing if the user is not an admin. Use authorization component patterns to guard access."
-        },
         {
           "path": "frontend/src/components/MainApp.tsx",
           "operation": "modify",
-          "description": "Wire the AdminPanel component into the main app layout. Import and render AdminPanel conditionally after authentication is confirmed. Position it appropriately in the UI (e.g., below the header or as a separate admin tab). The panel will self-guard based on admin status, so no additional wrapping guard is needed in MainApp."
+          "description": "Review and fix the authentication state flow in MainApp to ensure non-admin users are properly routed after login. The component currently sequences through loading, auth, approval, and profile states. Add robust error handling for approval status checks and profile loading failures. Ensure the pending-approval UI is shown correctly when isCallerApproved returns false. Add error boundaries or fallback states for cases where backend queries fail during the post-login sequence. Verify the component does not get stuck in a loading state when approval or profile queries encounter errors. Keep all admin-related logic unchanged."
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a React Query mutation hook useUpdateParticipationLevel that wraps the backend updateParticipationLevel function. Ensure it accepts a user Principal and a ParticipationLevel enum value. On success, invalidate the currentUserProfile and any user-list queries to refresh the UI. Add error handling with toast notifications for authorization failures."
+          "description": "Review the useIsCallerApproved and useGetCallerUserProfile query hooks to ensure they handle errors gracefully and do not cause the UI to freeze or show blank screens. Add retry logic with appropriate retry counts (e.g., retry: 1) and staleTime configuration to prevent infinite loading states. Ensure the enabled flag correctly waits for actor availability. Add onError callbacks to log failures without breaking the UI flow. Verify that approval status queries return proper boolean values and do not throw unhandled exceptions that could leave users stuck on a blank screen."
+        },
+        {
+          "path": "frontend/src/components/LoginScreen.tsx",
+          "operation": "modify",
+          "description": "Review the login button implementation to ensure error handling is robust when login succeeds but subsequent backend calls (approval check, profile fetch) fail. Add a fallback error message or retry mechanism if the user successfully authenticates but cannot proceed to the next screen. Ensure the component does not rely solely on MainApp's state transitions and provides user feedback if something goes wrong during the post-login flow."
         }
       ]
     }

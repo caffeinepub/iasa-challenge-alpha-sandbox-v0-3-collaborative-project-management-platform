@@ -1,90 +1,26 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "A participation/voting system with tiered levels and role mapping. Participants have levels (Apprentice, Journeyman, Master, Guest Artist) with corresponding voting power (0, 1, 3, 4). Roles include Project Manager, Mentor/Product Owner, Team Player, and Administrator. Level changes are restricted to Administrator only.",
+  "summary": "App deployed at https://iasa-challenge-har.caffeine.xyz/. Admin access working. External user (jedvogdt@gmail.com) cannot connect. Fix in progress.",
   "architectural_notes": [
-    "Participation levels: Apprentice, Journeyman, Master, Guest Artist — with voting power 0, 1, 3, 4 respectively",
-    "Roles: PM (Journeyman/Master), Mentor/PO (Master/Guest Artist), Team Player (any), Administrator (jv@grupoiasa.cl)",
-    "Participant level is immutable by the participant; only Administrator can modify it"
+    "Admin access is working and must not be modified",
+    "External/non-admin user access (e.g. jedvogdt@gmail.com) has a known connection issue being fixed"
   ],
-  "known_issues": [],
-  "isFixRequest": false,
+  "known_issues": [
+    "External user (jedvogdt@gmail.com) cannot connect to the app as a non-admin user"
+  ],
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-update-the-profilesetupmodal-to-include-a-participation-level-selector-apprentice-journeyman-master-guest-artist-with-concise-descriptions-for-each-the-selected-level-must-be-submitted-to-the-backend-during-profile-registration",
-      "title": "Update the ProfileSetupModal to include a participation level selector (Apprentice, Journeyman, Master, Guest Artist) with concise descriptions for each. The selected level must be submitted to the backend during profile registration.",
-      "reqIds": [
-        "REQ-4"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-display-the-participant-s-participation-level-e-g-apprentice-journeyman-master-guest-artist-and-their-derived-voting-power-in-the-header-user-dropdown-and-in-the-dashboard-scorecard-replacing-or-supplementing-any-previously-generic-role-voting-power-display",
-      "title": "Display the participant's participation level (e.g., 'Apprentice', 'Journeyman', 'Master', 'Guest Artist') and their derived voting power in the Header user dropdown and in the Dashboard scorecard, replacing or supplementing any previously generic role/voting-power display.",
-      "reqIds": [
-        "REQ-5"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-provide-an-administrator-only-ui-panel-accessible-only-when-logged-in-as-the-administrator-principal-jv-grupoiasa-cl-that-allows-changing-any-participant-s-participation-level-this-panel-must-not-be-visible-or-accessible-to-non-admin-users",
-      "title": "Provide an Administrator-only UI panel (accessible only when logged in as the Administrator principal jv@grupoiasa.cl) that allows changing any participant's participation level. This panel must not be visible or accessible to non-admin users.",
-      "reqIds": [
-        "REQ-6"
-      ],
-      "version": 1
-    }
-  ],
-  "new_feature_requests": [
-    {
-      "id": "AR-1",
-      "summary": "Participation levels: Apprentice (VP=0), Journeyman (VP=1), Master (VP=3), Guest Artist/Mentor (VP=4)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Voting power assigned per participation level; used in decision-making flows",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "Participant level is self-selected once, then locked — only Administrator (jv@grupoiasa.cl) can change it",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Role mapping: PM (Journeyman or Master), Mentor/Product Owner (Master or Guest Artist), Team Player (any level), Administrator (jv@grupoiasa.cl)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-5",
-      "summary": "Define four participation levels in the backend data model: Apprentice (student/young professional), Journeyman (project leader), Master (senior professional), and Guest Artist (external professional). Each level must carry an initial voting power: Apprentice = 0, Journeyman = 1, Master = 3, Guest Artist = 4.",
+      "id": "feature-fix-the-authentication-and-connection-flow-so-that-external-non-admin-users-such-as-jedvogdt-gmail-com-can-successfully-log-in-and-access-the-app-via-internet-identity-at-https-iasa-challenge-har-caffeine-xyz-the-issue-may-stem-from-error-handling-or-state-transitions-after-login-for-users-who-are-not-administrators-do-not-alter-any-admin-related-logic-admin-access-flow-or-any-other-existing-app-functionality",
+      "title": "Fix the authentication and connection flow so that external (non-admin) users such as jedvogdt@gmail.com can successfully log in and access the app via Internet Identity at https://iasa-challenge-har.caffeine.xyz/. The issue may stem from error handling or state transitions after login for users who are not administrators. Do NOT alter any admin-related logic, admin access flow, or any other existing app functionality.",
       "reqIds": [
         "REQ-1"
       ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-6",
-      "summary": "Allow a participant to self-select their participation level once during profile setup. After the initial selection, the level must be locked and can only be modified by the Administrator (principal associated with jv@grupoiasa.cl).",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-7",
-      "summary": "Enforce role assignment constraints in the backend: Project Manager (PM) role may only be assigned to Journeyman or Master participants; Mentor/Product Owner role may only be assigned to Master or Guest Artist participants; Team Player role is open to Apprentice, Journeyman, or Master; Administrator role is reserved for jv@grupoiasa.cl.",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "status": "pending"
+      "version": 1
     }
   ],
+  "new_feature_requests": [],
   "gameProjectType": "none",
   "projectName": "IASA Challenge",
   "clarification_mode": "instant",

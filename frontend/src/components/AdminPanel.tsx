@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import { useIsCallerAdmin, useUpdateParticipationLevel, useGetUserProfile } from '../hooks/useQueries';
+import {
+  useIsCallerAdmin,
+  useUpdateParticipationLevel,
+  useGetUserProfile,
+  useListApprovals,
+  useSetApproval,
+} from '../hooks/useQueries';
 import { useGetProjects } from '../hooks/useQueries';
-import { ParticipationLevel } from '../backend';
+import { ParticipationLevel, ApprovalStatus } from '../backend';
 import type { Principal } from '@icp-sdk/core/principal';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Shield, ChevronDown, Save, Users } from 'lucide-react';
+import { Shield, ChevronDown, Save, Users, UserCheck, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -132,11 +138,65 @@ function UserRow({ principal, onLevelChange, isUpdating }: UserRowProps) {
   );
 }
 
+interface PendingMemberRowProps {
+  principal: Principal;
+  onApprove: (user: Principal) => Promise<void>;
+  onReject: (user: Principal) => Promise<void>;
+  isProcessing: boolean;
+}
+
+function PendingMemberRow({ principal, onApprove, onReject, isProcessing }: PendingMemberRowProps) {
+  const principalStr = principal.toString();
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-3 border-b last:border-0">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="h-9 w-9 shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+          <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-mono truncate text-foreground">{principalStr.slice(0, 32)}…</p>
+          <p className="text-xs text-muted-foreground">Awaiting approval</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Button
+          size="sm"
+          variant="default"
+          className="h-8 gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+          onClick={() => onApprove(principal)}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : (
+            <CheckCircle2 className="h-3.5 w-3.5" />
+          )}
+          Accept
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5 text-destructive border-destructive/40 hover:bg-destructive/10"
+          onClick={() => onReject(principal)}
+          disabled={isProcessing}
+        >
+          <XCircle className="h-3.5 w-3.5" />
+          Reject
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const { data: isAdmin, isLoading: adminLoading } = useIsCallerAdmin();
   const { data: projects = [] } = useGetProjects();
+  const { data: approvals = [], isLoading: approvalsLoading, refetch: refetchApprovals } = useListApprovals();
   const updateLevel = useUpdateParticipationLevel();
+  const setApproval = useSetApproval();
   const [isOpen, setIsOpen] = useState(false);
+  const [processingPrincipal, setProcessingPrincipal] = useState<string | null>(null);
 
   // Collect all unique participants across all projects (including creators)
   const allPrincipals = Array.from(
@@ -148,12 +208,41 @@ export default function AdminPanel() {
     ).values()
   );
 
+  // Filter pending approvals
+  const pendingApprovals = approvals.filter((a) => a.status === ApprovalStatus.pending);
+
   const handleLevelChange = async (user: Principal, level: ParticipationLevel) => {
     try {
       await updateLevel.mutateAsync({ user, level });
       toast.success('Participation level updated successfully');
     } catch (error: any) {
       toast.error(error.message || 'Failed to update participation level');
+    }
+  };
+
+  const handleApprove = async (user: Principal) => {
+    setProcessingPrincipal(user.toString());
+    try {
+      await setApproval.mutateAsync({ user, status: ApprovalStatus.approved });
+      toast.success('User approved successfully. They can now access the application.');
+      refetchApprovals();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to approve user');
+    } finally {
+      setProcessingPrincipal(null);
+    }
+  };
+
+  const handleReject = async (user: Principal) => {
+    setProcessingPrincipal(user.toString());
+    try {
+      await setApproval.mutateAsync({ user, status: ApprovalStatus.rejected });
+      toast.success('User rejected.');
+      refetchApprovals();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reject user');
+    } finally {
+      setProcessingPrincipal(null);
     }
   };
 
@@ -177,7 +266,12 @@ export default function AdminPanel() {
                       Administrator Panel
                     </CardTitle>
                     <CardDescription className="text-xs mt-0.5">
-                      Manage participant levels · {allPrincipals.length} participant(s) found
+                      Manage members &amp; participation levels
+                      {pendingApprovals.length > 0 && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs font-semibold text-red-700 dark:text-red-300">
+                          {pendingApprovals.length} pending
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                 </div>
@@ -191,44 +285,96 @@ export default function AdminPanel() {
           </CardHeader>
 
           <CollapsibleContent>
-            <CardContent className="pt-0">
-              {/* Legend */}
-              <div className="mb-4 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-3">
-                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
-                  Voting Power by Level:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {PARTICIPATION_LEVEL_OPTIONS.map((opt) => (
-                    <span
-                      key={opt.value}
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        LEVEL_BADGE_COLORS[opt.value]
-                      }`}
-                    >
-                      {opt.label}: VP {opt.votingPower}
-                    </span>
-                  ))}
+            <CardContent className="pt-0 space-y-6">
+
+              {/* ── Pending Members Section ── */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <UserCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                    Pending Members
+                  </h3>
+                  {pendingApprovals.length > 0 && (
+                    <Badge variant="destructive" className="text-xs h-5 px-1.5">
+                      {pendingApprovals.length}
+                    </Badge>
+                  )}
                 </div>
+
+                {approvalsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : pendingApprovals.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground rounded-md bg-muted/30 border border-dashed">
+                    <CheckCircle2 className="h-6 w-6 mb-2 opacity-40" />
+                    <p className="text-sm">No pending approval requests.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border bg-card">
+                    {pendingApprovals.map((approval) => (
+                      <PendingMemberRow
+                        key={approval.principal.toString()}
+                        principal={approval.principal}
+                        onApprove={handleApprove}
+                        onReject={handleReject}
+                        isProcessing={processingPrincipal === approval.principal.toString()}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {allPrincipals.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                  <Users className="h-8 w-8 mb-2 opacity-40" />
-                  <p className="text-sm">No participants found yet.</p>
-                  <p className="text-xs mt-1">Participants will appear here once they join a project.</p>
+              {/* ── Participation Level Management Section ── */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                    Participation Levels
+                  </h3>
+                  <span className="text-xs text-muted-foreground">({allPrincipals.length} participant(s))</span>
                 </div>
-              ) : (
-                <div>
-                  {allPrincipals.map((principal) => (
-                    <UserRow
-                      key={principal.toString()}
-                      principal={principal}
-                      onLevelChange={handleLevelChange}
-                      isUpdating={updateLevel.isPending}
-                    />
-                  ))}
+
+                {/* Legend */}
+                <div className="mb-4 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-3">
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-2">
+                    Voting Power by Level:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {PARTICIPATION_LEVEL_OPTIONS.map((opt) => (
+                      <span
+                        key={opt.value}
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          LEVEL_BADGE_COLORS[opt.value]
+                        }`}
+                      >
+                        {opt.label}: VP {opt.votingPower}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              )}
+
+                {allPrincipals.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                    <Users className="h-8 w-8 mb-2 opacity-40" />
+                    <p className="text-sm">No participants found yet.</p>
+                    <p className="text-xs mt-1">Participants will appear here once they join a project.</p>
+                  </div>
+                ) : (
+                  <div>
+                    {allPrincipals.map((principal) => (
+                      <UserRow
+                        key={principal.toString()}
+                        principal={principal}
+                        onLevelChange={handleLevelChange}
+                        isUpdating={updateLevel.isPending}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
             </CardContent>
           </CollapsibleContent>
         </Card>

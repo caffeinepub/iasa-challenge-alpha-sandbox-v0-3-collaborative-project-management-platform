@@ -1,50 +1,13 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-27T22:30:34.166Z",
-  "summary": "The diff implements most of the required functionality across backend and frontend. Backend defines ParticipationLevel variant, voting power derivation, role constraints, setParticipationLevel, and participationLevelLocked. Frontend updates ProfileSetupModal, Dashboard, Header, and adds AdminPanel. However, there are gaps around how the Administrator principal is initialized (bound to jv@grupoiasa.cl identity during canister init vs. a hardcoded string), and REQ-4's read-only enforcement after profile creation is UI-only without clear evidence. Overall coverage is high.",
-  "missing_requirements": [
-    {
-      "id": "REQ-2",
-      "requirement": "The Administrator principal is initialised to the identity corresponding to jv@grupoiasa.cl — must be bound during canister initialization or via a dedicated admin-registration step, not a hardcoded string match.",
-      "reason": "The diff shows AccessControl.initialize is called via a public shared function initializeAccessControl() that any caller can invoke. There is no evidence that the admin principal is pre-bound to the jv@grupoiasa.cl identity at canister deploy time or that initialization is restricted. The constraint explicitly says do not use a hardcoded string match; bind it during canister initialization or via a dedicated admin-registration step. The public shared function approach without any guard means anyone could call it first and claim admin.",
-      "evidence": [
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "requirement": "After profile creation, the participation level field is read-only for non-admin users in the frontend.",
-      "reason": "The ProfileSetupModal diff shows the level selector during setup, but there is no evidence of a profile-edit view or settings screen where the participation level field is rendered as read-only for non-admin users post-creation. The truncated diff does not show any such locked or read-only display.",
-      "evidence": [
-        "frontend/src/components/ProfileSetupModal.tsx"
-      ]
-    }
-  ],
-  "hallucinated_features": [
-    {
-      "description": "A migration module with OldActorState and NewActorState types for state migration was added.",
-      "reason": "The build request does not mention any state migration requirement. The added migration.mo file defines old and new actor state types and a migration function not requested in any REQ.",
-      "evidence": [
-        "backend/migration.mo"
-      ]
-    },
-    {
-      "description": "ProfileSetupModal includes a compatible squad role selector filtered by the chosen participation level, with role labels and default role derivation logic.",
-      "reason": "REQ-4 only requests a participation level selector with descriptions submitted to the backend. The additional role selector UI within the modal was not explicitly requested as part of REQ-4.",
-      "evidence": [
-        "frontend/src/components/ProfileSetupModal.tsx"
-      ]
-    }
-  ],
-  "confidence": 0.72,
+  "generatedAt": "2026-02-28T13:57:30.278Z",
+  "summary": "The diff implements fixes to the authentication and connection flow for non-admin users in MainApp.tsx, useQueries.ts, and ProfileSetupModal.tsx. The changes add graceful error handling for non-approved users, a proper step-by-step auth state machine, profile setup flow for new users, and approval request handling. These changes directly address REQ-1's requirements for non-admin user login and navigation to correct screens after login, while leaving admin logic untouched.",
+  "missing_requirements": [],
+  "hallucinated_features": [],
+  "confidence": 0.88,
   "changed_files": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/AdminPanel.tsx",
-    "frontend/src/components/Dashboard.tsx",
-    "frontend/src/components/Header.tsx",
     "frontend/src/components/MainApp.tsx",
     "frontend/src/components/ProfileSetupModal.tsx",
     "frontend/src/hooks/useQueries.ts",

@@ -2,49 +2,9 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-profilesetupmodal-to-include-a-participation-level-selector-apprentice-journeyman-master-guest-artist-with-concise-descriptions-for-each-the-selected-level-must-be-submitted-to-the-backend-during-profile-registration",
-      "featureTitle": "Update the ProfileSetupModal to include a participation level selector (Apprentice, Journeyman, Master, Guest Artist) with concise descriptions for each. The selected level must be submitted to the backend during profile registration.",
+      "featureId": "feature-fix-the-authentication-and-connection-flow-so-that-external-non-admin-users-such-as-jedvogdt-gmail-com-can-successfully-log-in-and-access-the-app-via-internet-identity-at-https-iasa-challenge-har-caffeine-xyz-the-issue-may-stem-from-error-handling-or-state-transitions-after-login-for-users-who-are-not-administrators-do-not-alter-any-admin-related-logic-admin-access-flow-or-any-other-existing-app-functionality",
+      "featureTitle": "Fix the authentication and connection flow so that external (non-admin) users such as jedvogdt@gmail.com can successfully log in and access the app via Internet Identity at https://iasa-challenge-har.caffeine.xyz/. The issue may stem from error handling or state transitions after login for users who are not administrators. Do NOT alter any admin-related logic, admin access flow, or any other existing app functionality.",
       "files": [
-        "frontend/src/components/ProfileSetupModal.tsx"
-      ],
-      "components": [
-        "authorization@1.0.1",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-4"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-display-the-participant-s-participation-level-e-g-apprentice-journeyman-master-guest-artist-and-their-derived-voting-power-in-the-header-user-dropdown-and-in-the-dashboard-scorecard-replacing-or-supplementing-any-previously-generic-role-voting-power-display",
-      "featureTitle": "Display the participant's participation level (e.g., 'Apprentice', 'Journeyman', 'Master', 'Guest Artist') and their derived voting power in the Header user dropdown and in the Dashboard scorecard, replacing or supplementing any previously generic role/voting-power display.",
-      "files": [
-        "frontend/src/components/Dashboard.tsx",
-        "frontend/src/components/Header.tsx"
-      ],
-      "components": [
-        "authorization@1.0.1",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-5"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-provide-an-administrator-only-ui-panel-accessible-only-when-logged-in-as-the-administrator-principal-jv-grupoiasa-cl-that-allows-changing-any-participant-s-participation-level-this-panel-must-not-be-visible-or-accessible-to-non-admin-users",
-      "featureTitle": "Provide an Administrator-only UI panel (accessible only when logged in as the Administrator principal jv@grupoiasa.cl) that allows changing any participant's participation level. This panel must not be visible or accessible to non-admin users.",
-      "files": [
-        "frontend/src/components/AdminPanel.tsx",
         "frontend/src/components/MainApp.tsx",
         "frontend/src/hooks/useQueries.ts"
       ],
@@ -54,10 +14,11 @@
         "shadcn-ui@1.0.0",
         "build-template-react@1.0.0",
         "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
+        "github-export-icp-cli@1.0.0",
+        "user-approval@1.0.0"
       ],
       "testIds": [
-        "REQ-6"
+        "REQ-1"
       ],
       "confidence": "high"
     }

@@ -9,7 +9,8 @@
     "shadcn-ui": "1.0.0",
     "build-template-react": "1.0.0",
     "initial-app": "1.0.0",
-    "github-export-icp-cli": "1.0.0"
+    "github-export-icp-cli": "1.0.0",
+    "user-approval": "1.0.0"
   },
   "failedMigrationVersion": "0.10.5",
   "aiCoreVersion": "0.20.4",
