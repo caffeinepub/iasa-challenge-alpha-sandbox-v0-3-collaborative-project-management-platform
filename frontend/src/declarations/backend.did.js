@@ -164,6 +164,18 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getChallenges' : IDL.Func([IDL.Nat], [IDL.Vec(Challenge)], ['query']),
+  'getCurrentUserStatus' : IDL.Func(
+      [],
+      [
+        IDL.Variant({
+          'unapproved' : IDL.Null,
+          'admin' : IDL.Null,
+          'pending' : IDL.Null,
+          'approved' : IDL.Null,
+        }),
+      ],
+      ['query'],
+    ),
   'getPeerRatings' : IDL.Func([IDL.Nat], [IDL.Vec(PeerRating)], ['query']),
   'getPledges' : IDL.Func([IDL.Nat], [IDL.Vec(Pledge)], ['query']),
   'getProjects' : IDL.Func([], [IDL.Vec(Project)], ['query']),
@@ -364,6 +376,18 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getChallenges' : IDL.Func([IDL.Nat], [IDL.Vec(Challenge)], ['query']),
+    'getCurrentUserStatus' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'unapproved' : IDL.Null,
+            'admin' : IDL.Null,
+            'pending' : IDL.Null,
+            'approved' : IDL.Null,
+          }),
+        ],
+        ['query'],
+      ),
     'getPeerRatings' : IDL.Func([IDL.Nat], [IDL.Vec(PeerRating)], ['query']),
     'getPledges' : IDL.Func([IDL.Nat], [IDL.Vec(Pledge)], ['query']),
     'getProjects' : IDL.Func([], [IDL.Vec(Project)], ['query']),

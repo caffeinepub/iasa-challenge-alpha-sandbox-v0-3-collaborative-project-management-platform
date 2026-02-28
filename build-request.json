@@ -1,39 +1,83 @@
 {
   "kind": "build_request",
-  "title": "Fix external user (non-admin) login and connection issue",
+  "title": "Fix non-admin onboarding: Apply → Admin Approves → Member Accesses",
+  "projectName": "IASA Challenge",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the authentication and connection flow so that external (non-admin) users such as jedvogdt@gmail.com can successfully log in and access the app via Internet Identity at https://iasa-challenge-har.caffeine.xyz/. The issue may stem from error handling or state transitions after login for users who are not administrators. Do NOT alter any admin-related logic, admin access flow, or any other existing app functionality.",
-      "target": "frontend",
+      "text": "In the backend (main.mo), ensure the access-check logic for non-administrator principals follows this exact sequence: (a) if the caller is the hardcoded admin principal (jv@grupoiasa.cl), grant full access immediately; (b) if the caller has a pending approval request, return a 'pending' status; (c) if the caller has been approved by the administrator, grant member access; (d) if the caller has no record at all, return an 'unapproved/no-request' status. Do not alter any admin-gated operations or existing data structures; only repair the status-resolution logic so approved members are correctly recognized.",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-8"
         ],
         "quotes": [
-          "I still cannot connect as an external user (jedvogdt@gmail.com). Please fix the access problem, DONT CHANGE ANYTHING WITHIN THE APP OR FOR THE ADMINISTRATOR ACCESS (WHICH IS WORKING)"
+          "fix the problem of access for non-administrator users",
+          "once approved by the administrator, other Members get Access with their internet identity",
+          "DO NOT CHANGE ANYTHING ELSE, INSIDE THE APP OR WITH RESPECT TO THE ADMINISTRATOR ACCESS"
         ]
       },
       "acceptanceCriteria": [
-        "A non-admin user (e.g. jedvogdt@gmail.com) can log in via Internet Identity without encountering a connection error or blank/stuck screen.",
-        "After login, a non-admin user is directed to the correct screen (pending approval UI, profile setup, or dashboard) depending on their approval status.",
-        "Admin login flow and admin panel access remain fully unchanged and functional.",
-        "No other existing app features or UI are modified."
+        "Administrator principal (jv@grupoiasa.cl) retains full admin access unchanged.",
+        "A principal with no record receives a status indicating they must apply for access.",
+        "A principal with a pending request receives a status indicating approval is pending.",
+        "A principal whose request has been approved by the administrator receives full member access.",
+        "No existing backend data structures, admin operations, or other logic are modified."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "In MainApp.tsx, implement the three-step non-admin onboarding gate. After a user authenticates via Internet Identity and is confirmed to be non-admin, query their approval status and route them as follows: (a) Status = no record → show 'Apply for Access' screen where the user can submit an access request (calling the existing requestApproval backend method); (b) Status = pending → show a 'Your request is pending administrator approval' holding screen with no further actions; (c) Status = approved → proceed into the normal app flow (ProfileSetupModal if new, then Dashboard). Do not alter the admin flow, LoginScreen, Dashboard, or any other component.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-8"
+        ],
+        "quotes": [
+          "generate a logical on-boarding sequence: 1) Apply for access; 2) Administrator approves access (in the adminnistrator panel, which already exists), 3) once approved by the administrator, other Members get Access",
+          "DO NOT CHANGE ANYTHING ELSE, INSIDE THE APP OR WITH RESPECT TO THE ADMINISTRATOR ACCESS"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A first-time authenticated non-admin user sees an 'Apply for Access' screen with a submit button.",
+        "After submitting an access request, the user is immediately shown a 'Pending Approval' holding screen.",
+        "An approved member is routed directly into the app (ProfileSetupModal if new, then Dashboard).",
+        "Administrator users are not affected — their flow is unchanged.",
+        "LoginScreen, Dashboard, AdminPanel, and all other components are not modified."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "In the existing AdminPanel.tsx approval section, ensure that pending access requests submitted by non-admin users via REQ-2 appear in the approval list and that approving them correctly sets their status to approved (allowing entry per REQ-1/REQ-2). This must use the existing approval infrastructure already present in AdminPanel.tsx and useQueries.ts without restructuring those components.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-8"
+        ],
+        "quotes": [
+          "Administrator approves access (in the adminnistrator panel, which already exists)"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Pending access requests from new users appear in the AdminPanel approval list.",
+        "Approving a request in the AdminPanel allows that user to enter the app on their next access.",
+        "AdminPanel layout and all other admin functionality remain unchanged."
       ]
     }
   ],
   "constraints": [
-    "Do NOT change any admin-related logic, admin access flow, or admin panel functionality.",
-    "Do NOT modify any other existing app features or UI.",
-    "Do NOT change the backend data model or any backend logic unrelated to the connection/auth flow.",
-    "Immutable frontend paths (useInternetIdentity.ts, useActor.ts, main.tsx, components/ui) must not be edited."
+    "Do not change administrator access logic or the admin principal check for jv@grupoiasa.cl.",
+    "Do not modify LoginScreen, Dashboard, AdminPanel structure, Header, Footer, or any component other than MainApp.tsx (and backend access-check logic).",
+    "Do not alter existing backend data structures, stable variables, or any admin-gated operations.",
+    "Do not touch any immutable frontend paths (hooks, main.tsx, ui components).",
+    "Base all changes on the Version 17 codebase."
   ],
   "nonGoals": [
-    "Changing any admin authentication or authorization logic.",
-    "Modifying app features, UI design, or content.",
-    "Backend schema migrations.",
-    "Adding new features."
+    "Changing the visual design or theme of any existing screen.",
+    "Adding new admin panel features beyond surfacing pending requests.",
+    "Modifying project, task, pledge, peer rating, or reputation logic.",
+    "Changing how the administrator (jv@grupoiasa.cl) logs in or accesses the app."
   ],
   "imageRequirements": {
     "required": [],

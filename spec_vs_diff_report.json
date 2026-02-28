@@ -1,15 +1,32 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-28T13:57:30.278Z",
-  "summary": "The diff implements fixes to the authentication and connection flow for non-admin users in MainApp.tsx, useQueries.ts, and ProfileSetupModal.tsx. The changes add graceful error handling for non-approved users, a proper step-by-step auth state machine, profile setup flow for new users, and approval request handling. These changes directly address REQ-1's requirements for non-admin user login and navigation to correct screens after login, while leaving admin logic untouched.",
-  "missing_requirements": [],
-  "hallucinated_features": [],
-  "confidence": 0.88,
+  "generatedAt": "2026-02-28T16:15:08.388Z",
+  "summary": "The diff modifies backend/main.mo, frontend/src/components/MainApp.tsx, frontend/src/hooks/useQueries.ts, and supporting files. REQ-2 (MainApp.tsx onboarding gate) and REQ-3 (AdminPanel approval infrastructure via useQueries) appear well-implemented. However, REQ-1 has a critical flaw: the backend getCurrentUserStatus function collapses the 'pending' and 'unapproved' states into a single #pending return, failing to distinguish between a caller with no record and one with a pending request.",
+  "missing_requirements": [
+    {
+      "id": "REQ-1",
+      "requirement": "If the caller has no record at all, return an 'unapproved/no-request' status (distinct from 'pending').",
+      "reason": "In backend/main.mo, the getCurrentUserStatus function checks UserApproval.isApproved and if false, returns #pending with a comment explicitly stating 'This combines pending and unapproved status, as there is no direct way to distinguish them'. The #unapproved variant is never returned by this function, so a principal with no record will receive #pending instead of #unapproved, breaking the required four-state sequence.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Legacy approval infrastructure (legacyApprovals map, getLegacyPrincipal, isLegacyApproved functions referencing 'jdv' and 'artifex' principals) added to backend.",
+      "reason": "The build request does not mention any legacy approval principals, a legacy approvals map, or special handling for 'jdv' or 'artifex' identifiers. This is new logic not requested in any requirement.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    }
+  ],
+  "confidence": 0.82,
   "changed_files": [
+    "backend/main.mo",
     "frontend-file-summaries.txt",
     "frontend/src/components/MainApp.tsx",
-    "frontend/src/components/ProfileSetupModal.tsx",
     "frontend/src/hooks/useQueries.ts",
     "project_state.json"
   ]

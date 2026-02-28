@@ -1,32 +1,44 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix external user (non-admin) login and connection issue",
+  "title": "Fix non-admin onboarding: Apply → Admin Approves → Member Accesses",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Fix the authentication and connection flow so that external (non-admin) users can successfully log in and access the app via Internet Identity without encountering connection errors or blank screens",
+      "id": "REQ-2",
+      "summary": "Implement three-step non-admin onboarding gate in MainApp.tsx: show 'Apply for Access' screen for new users, 'Pending Approval' holding screen for submitted requests, and normal app flow for approved members",
       "acceptanceCriteria": [
-        "A non-admin user (e.g. jedvogdt@gmail.com) can log in via Internet Identity without encountering a connection error or blank/stuck screen.",
-        "After login, a non-admin user is directed to the correct screen (pending approval UI, profile setup, or dashboard) depending on their approval status.",
-        "Admin login flow and admin panel access remain fully unchanged and functional.",
-        "No other existing app features or UI are modified."
+        "A first-time authenticated non-admin user sees an 'Apply for Access' screen with a submit button.",
+        "After submitting an access request, the user is immediately shown a 'Pending Approval' holding screen.",
+        "An approved member is routed directly into the app (ProfileSetupModal if new, then Dashboard).",
+        "Administrator users are not affected — their flow is unchanged.",
+        "LoginScreen, Dashboard, AdminPanel, and all other components are not modified."
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/MainApp.tsx",
           "operation": "modify",
-          "description": "Review and fix the authentication state flow in MainApp to ensure non-admin users are properly routed after login. The component currently sequences through loading, auth, approval, and profile states. Add robust error handling for approval status checks and profile loading failures. Ensure the pending-approval UI is shown correctly when isCallerApproved returns false. Add error boundaries or fallback states for cases where backend queries fail during the post-login sequence. Verify the component does not get stuck in a loading state when approval or profile queries encounter errors. Keep all admin-related logic unchanged."
+          "description": "After authentication and admin check, query getCurrentUserStatus() to determine the user's approval state. Route non-admin users based on status: (a) 'unapproved' → render ApplyForAccessScreen inline component with a button that calls requestApproval() mutation, then refetch status; (b) 'pending' → render PendingApprovalScreen inline component displaying a holding message with no actions; (c) 'approved' → proceed to existing ProfileSetupModal check and Dashboard flow. Keep the admin flow (isCallerAdmin check) completely unchanged. Do not modify any other component imports or rendering logic for LoginScreen, Dashboard, or AdminPanel."
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Review the useIsCallerApproved and useGetCallerUserProfile query hooks to ensure they handle errors gracefully and do not cause the UI to freeze or show blank screens. Add retry logic with appropriate retry counts (e.g., retry: 1) and staleTime configuration to prevent infinite loading states. Ensure the enabled flag correctly waits for actor availability. Add onError callbacks to log failures without breaking the UI flow. Verify that approval status queries return proper boolean values and do not throw unhandled exceptions that could leave users stuck on a blank screen."
-        },
+          "description": "Add useGetCurrentUserStatus query hook that calls actor.getCurrentUserStatus() and returns the Variant_unapproved_admin_pending_approved enum. Add useRequestApproval mutation hook that calls actor.requestApproval() and invalidates the 'currentUserStatus' query key on success. Ensure both hooks follow the existing pattern (enabled when actor is available, proper error handling)."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Verify AdminPanel approval section surfaces pending access requests from REQ-2 and that approving them sets status to approved",
+      "acceptanceCriteria": [
+        "Pending access requests from new users appear in the AdminPanel approval list.",
+        "Approving a request in the AdminPanel allows that user to enter the app on their next access.",
+        "AdminPanel layout and all other admin functionality remain unchanged."
+      ],
+      "file_operations": [
         {
-          "path": "frontend/src/components/LoginScreen.tsx",
+          "path": "frontend/src/components/AdminPanel.tsx",
           "operation": "modify",
-          "description": "Review the login button implementation to ensure error handling is robust when login succeeds but subsequent backend calls (approval check, profile fetch) fail. Add a fallback error message or retry mechanism if the user successfully authenticates but cannot proceed to the next screen. Ensure the component does not rely solely on MainApp's state transitions and provides user feedback if something goes wrong during the post-login flow."
+          "description": "Review the existing approval section to confirm it already uses useListApprovals and useSetApproval hooks from useQueries.ts. Verify that pending requests submitted via requestApproval() appear in the list and that calling setApproval(user, 'approved') correctly updates the user's status. If the UI does not clearly indicate the approved status change, add a toast notification on successful approval. Do not restructure the component or modify the user management section."
         }
       ]
     }

@@ -138,6 +138,13 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getChallenges' : ActorMethod<[bigint], Array<Challenge>>,
+  'getCurrentUserStatus' : ActorMethod<
+    [],
+    { 'unapproved' : null } |
+      { 'admin' : null } |
+      { 'pending' : null } |
+      { 'approved' : null }
+  >,
   'getPeerRatings' : ActorMethod<[bigint], Array<PeerRating>>,
   'getPledges' : ActorMethod<[bigint], Array<Pledge>>,
   'getProjects' : ActorMethod<[], Array<Project>>,

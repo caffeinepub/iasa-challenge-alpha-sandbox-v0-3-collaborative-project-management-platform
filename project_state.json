@@ -1,26 +1,50 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "App deployed at https://iasa-challenge-har.caffeine.xyz/. Admin access working. External user (jedvogdt@gmail.com) cannot connect. Fix in progress.",
+  "summary": "Web application with Internet Identity authentication. Administrator (jv@grupoiasa.cl) has working access. Non-admin users require a 3-step onboarding: 1) Apply for access, 2) Administrator approves via admin panel, 3) Approved members gain access via Internet Identity. Fix in progress on Version 17 base.",
   "architectural_notes": [
-    "Admin access is working and must not be modified",
-    "External/non-admin user access (e.g. jedvogdt@gmail.com) has a known connection issue being fixed"
+    "Admin user is jv@grupoiasa.cl; admin access must never be broken by member onboarding changes",
+    "Non-admin onboarding flow: 1) Apply for access, 2) Admin approves in admin panel, 3) Approved member logs in via Internet Identity",
+    "Version 12 had working member access; Version 13 broke it — Version 17 is the last known-good base"
   ],
   "known_issues": [
-    "External user (jedvogdt@gmail.com) cannot connect to the app as a non-admin user"
+    "Non-admin users (e.g. jedvogdt@gmail.com) cannot access the app from Version 13 onwards due to broken access control logic"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-the-authentication-and-connection-flow-so-that-external-non-admin-users-such-as-jedvogdt-gmail-com-can-successfully-log-in-and-access-the-app-via-internet-identity-at-https-iasa-challenge-har-caffeine-xyz-the-issue-may-stem-from-error-handling-or-state-transitions-after-login-for-users-who-are-not-administrators-do-not-alter-any-admin-related-logic-admin-access-flow-or-any-other-existing-app-functionality",
-      "title": "Fix the authentication and connection flow so that external (non-admin) users such as jedvogdt@gmail.com can successfully log in and access the app via Internet Identity at https://iasa-challenge-har.caffeine.xyz/. The issue may stem from error handling or state transitions after login for users who are not administrators. Do NOT alter any admin-related logic, admin access flow, or any other existing app functionality.",
+      "id": "feature-in-mainapp-tsx-implement-the-three-step-non-admin-onboarding-gate-after-a-user-authenticates-via-internet-identity-and-is-confirmed-to-be-non-admin-query-their-approval-status-and-route-them-as-follows-a-status-no-record-show-apply-for-access-screen-where-the-user-can-submit-an-access-request-calling-the-existing-requestapproval-backend-method-b-status-pending-show-a-your-request-is-pending-administrator-approval-holding-screen-with-no-further-actions-c-status-approved-proceed-into-the-normal-app-flow-profilesetupmodal-if-new-then-dashboard-do-not-alter-the-admin-flow-loginscreen-dashboard-or-any-other-component",
+      "title": "In MainApp.tsx, implement the three-step non-admin onboarding gate. After a user authenticates via Internet Identity and is confirmed to be non-admin, query their approval status and route them as follows: (a) Status = no record → show 'Apply for Access' screen where the user can submit an access request (calling the existing requestApproval backend method); (b) Status = pending → show a 'Your request is pending administrator approval' holding screen with no further actions; (c) Status = approved → proceed into the normal app flow (ProfileSetupModal if new, then Dashboard). Do not alter the admin flow, LoginScreen, Dashboard, or any other component.",
       "reqIds": [
-        "REQ-1"
+        "REQ-2"
       ],
       "version": 1
     }
   ],
-  "new_feature_requests": [],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Fix non-admin user access: implement 3-step onboarding (apply → admin approves → member accesses) without changing admin access or anything else inside the app",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "In the backend (main.mo), ensure the access-check logic for non-administrator principals follows this exact sequence: (a) if the caller is the hardcoded admin principal (jv@grupoiasa.cl), grant full access immediately; (b) if the caller has a pending approval request, return a 'pending' status; (c) if the caller has been approved by the administrator, grant member access; (d) if the caller has no record at all, return an 'unapproved/no-request' status. Do not alter any admin-gated operations or existing data structures; only repair the status-resolution logic so approved members are correctly recognized.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "In the existing AdminPanel.tsx approval section, ensure that pending access requests submitted by non-admin users via REQ-2 appear in the approval list and that approving them correctly sets their status to approved (allowing entry per REQ-1/REQ-2). This must use the existing approval infrastructure already present in AdminPanel.tsx and useQueries.ts without restructuring those components.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "status": "pending"
+    }
+  ],
   "gameProjectType": "none",
   "projectName": "IASA Challenge",
   "clarification_mode": "instant",

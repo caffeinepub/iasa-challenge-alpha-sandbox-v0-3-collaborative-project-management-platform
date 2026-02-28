@@ -1,11 +1,11 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the login and connection flow for non-admin (external) users so they can successfully authenticate via Internet Identity without errors or getting stuck.
+**Goal:** Fix the non-admin onboarding flow so that new users must apply for access, wait for admin approval, and only then enter the app — without changing any existing admin, login, or other component logic.
 
 **Planned changes:**
-- Investigate and fix error handling or state transitions that occur after Internet Identity login for non-admin users.
-- Ensure non-admin users are routed to the correct screen (pending approval, profile setup, or dashboard) based on their approval status after login.
-- Leave all admin login flow, admin panel logic, and all other app functionality completely untouched.
+- Fix backend (`main.mo`) access-check logic to correctly resolve non-admin principal status in this order: hardcoded admin → pending → approved → no record.
+- Add a three-step onboarding gate in `MainApp.tsx` for non-admin users: (a) no record → "Apply for Access" screen that calls `requestApproval`; (b) pending → "Pending Approval" holding screen; (c) approved → normal app flow (ProfileSetupModal if new, then Dashboard).
+- Ensure pending access requests submitted by new users appear in the existing `AdminPanel.tsx` approval list and that approving them sets their status to approved.
 
-**User-visible outcome:** External users (e.g. jedvogdt@gmail.com) can log in via Internet Identity at the app URL without encountering a connection error or blank/stuck screen, and are directed to the appropriate screen for their account status.
+**User-visible outcome:** A non-admin user who logs in for the first time can apply for access, sees a pending screen while awaiting approval, and is granted entry to the app once an administrator approves their request in the existing Admin Panel.

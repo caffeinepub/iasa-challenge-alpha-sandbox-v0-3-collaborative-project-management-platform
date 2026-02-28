@@ -136,6 +136,12 @@ export enum Variant_finalPrize_challenge_taskProposal {
     challenge = "challenge",
     taskProposal = "taskProposal"
 }
+export enum Variant_unapproved_admin_pending_approved {
+    unapproved = "unapproved",
+    admin = "admin",
+    pending = "pending",
+    approved = "approved"
+}
 export interface backendInterface {
     acceptTask(taskId: bigint): Promise<void>;
     approveTask(taskId: bigint): Promise<void>;
@@ -151,6 +157,7 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getChallenges(taskId: bigint): Promise<Array<Challenge>>;
+    getCurrentUserStatus(): Promise<Variant_unapproved_admin_pending_approved>;
     getPeerRatings(projectId: bigint): Promise<Array<PeerRating>>;
     getPledges(projectId: bigint): Promise<Array<Pledge>>;
     getProjects(): Promise<Array<Project>>;
