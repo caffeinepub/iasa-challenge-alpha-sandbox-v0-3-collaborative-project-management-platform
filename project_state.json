@@ -1,22 +1,30 @@
 {
   "schemaVersion": "1.0.0",
-  "projectStateVersion": 3,
-  "summary": "Web application with Internet Identity authentication. Administrator (jv@grupoiasa.cl) has working access. Non-admin users require a 3-step onboarding: 1) Apply for access, 2) Administrator approves via admin panel, 3) Approved members gain access via Internet Identity. Fix in progress on Version 17 base.",
+  "projectStateVersion": 5,
+  "summary": "New project",
   "architectural_notes": [
-    "Admin user is jv@grupoiasa.cl; admin access must never be broken by member onboarding changes",
-    "Non-admin onboarding flow: 1) Apply for access, 2) Admin approves in admin panel, 3) Approved member logs in via Internet Identity",
-    "Version 12 had working member access; Version 13 broke it — Version 17 is the last known-good base"
+    "Administration bar must be preserved across all versions — never remove or alter it without explicit user instruction",
+    "Profile setup flow must handle pre-existing users gracefully — detect duplicate and inform user or redirect, never silently fail"
   ],
   "known_issues": [
-    "Non-admin users (e.g. jedvogdt@gmail.com) cannot access the app from Version 13 onwards due to broken access control logic"
+    "Version 24 regression: administration bar was removed when decision log feature was added",
+    "Profile setup does not react when a pre-existing user attempts setup — '!User already exists' error occurs with no feedback to the user"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-in-mainapp-tsx-implement-the-three-step-non-admin-onboarding-gate-after-a-user-authenticates-via-internet-identity-and-is-confirmed-to-be-non-admin-query-their-approval-status-and-route-them-as-follows-a-status-no-record-show-apply-for-access-screen-where-the-user-can-submit-an-access-request-calling-the-existing-requestapproval-backend-method-b-status-pending-show-a-your-request-is-pending-administrator-approval-holding-screen-with-no-further-actions-c-status-approved-proceed-into-the-normal-app-flow-profilesetupmodal-if-new-then-dashboard-do-not-alter-the-admin-flow-loginscreen-dashboard-or-any-other-component",
-      "title": "In MainApp.tsx, implement the three-step non-admin onboarding gate. After a user authenticates via Internet Identity and is confirmed to be non-admin, query their approval status and route them as follows: (a) Status = no record → show 'Apply for Access' screen where the user can submit an access request (calling the existing requestApproval backend method); (b) Status = pending → show a 'Your request is pending administrator approval' holding screen with no further actions; (c) Status = approved → proceed into the normal app flow (ProfileSetupModal if new, then Dashboard). Do not alter the admin flow, LoginScreen, Dashboard, or any other component.",
+      "id": "feature-in-the-profile-setup-flow-before-attempting-to-register-a-new-user-check-whether-the-authenticated-user-already-has-an-existing-profile-in-the-backend-if-a-profile-already-exists-skip-the-profilesetupmodal-entirely-and-proceed-directly-to-the-main-app-experience-without-showing-an-error-or-doing-nothing-silently",
+      "title": "In the profile setup flow, before attempting to register a new user, check whether the authenticated user already has an existing profile in the backend. If a profile already exists, skip the ProfileSetupModal entirely and proceed directly to the main app experience without showing an error or doing nothing silently.",
       "reqIds": [
         "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-that-only-administrators-can-create-a-new-profile-for-an-existing-user-regular-users-must-not-be-able-to-trigger-a-profile-creation-or-re-registration-if-they-already-have-a-profile-the-adminpanel-s-ability-to-manage-create-user-profiles-must-remain-unrestricted-for-admin-users",
+      "title": "Ensure that only administrators can create a new profile for an existing user. Regular users must not be able to trigger a profile creation or re-registration if they already have a profile. The AdminPanel's ability to manage/create user profiles must remain unrestricted for admin users.",
+      "reqIds": [
+        "REQ-3"
       ],
       "version": 1
     }
@@ -24,29 +32,20 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Fix non-admin user access: implement 3-step onboarding (apply → admin approves → member accesses) without changing admin access or anything else inside the app",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "In the backend (main.mo), ensure the access-check logic for non-administrator principals follows this exact sequence: (a) if the caller is the hardcoded admin principal (jv@grupoiasa.cl), grant full access immediately; (b) if the caller has a pending approval request, return a 'pending' status; (c) if the caller has been approved by the administrator, grant member access; (d) if the caller has no record at all, return an 'unapproved/no-request' status. Do not alter any admin-gated operations or existing data structures; only repair the status-resolution logic so approved members are correctly recognized.",
+      "summary": "Restore the AdminPanel component and its conditional rendering in MainApp.tsx exactly as it existed in Version 23. The AdminPanel must be visible to admin users in the main app shell alongside the Header, Dashboard, and Footer — it must not have been removed or hidden when the decision log feature was added in Version 24.",
       "reqIds": [
         "REQ-1"
       ],
       "status": "pending"
     },
     {
-      "id": "AR-4",
-      "summary": "In the existing AdminPanel.tsx approval section, ensure that pending access requests submitted by non-admin users via REQ-2 appear in the approval list and that approving them correctly sets their status to approved (allowing entry per REQ-1/REQ-2). This must use the existing approval infrastructure already present in AdminPanel.tsx and useQueries.ts without restructuring those components.",
-      "reqIds": [
-        "REQ-3"
-      ],
+      "id": "AR-2",
+      "summary": "Fix profile setup flow: when a pre-existing user tries to set up a profile, the app should detect the existing user and respond appropriately (e.g., skip setup or show a message) instead of silently doing nothing. Only administrators should be able to create new profiles for existing users.",
+      "reqIds": [],
       "status": "pending"
     }
   ],
-  "gameProjectType": "none",
-  "projectName": "IASA Challenge",
+  "projectName": "Restore administration bar removed in Version 24 regression",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

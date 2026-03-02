@@ -1,11 +1,13 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the non-admin onboarding flow so that new users must apply for access, wait for admin approval, and only then enter the app — without changing any existing admin, login, or other component logic.
+**Goal:** Fix the profile setup flow so that pre-existing users bypass the ProfileSetupModal and are taken directly to the main app, while ensuring only administrators can create profiles for already-registered users.
 
 **Planned changes:**
-- Fix backend (`main.mo`) access-check logic to correctly resolve non-admin principal status in this order: hardcoded admin → pending → approved → no record.
-- Add a three-step onboarding gate in `MainApp.tsx` for non-admin users: (a) no record → "Apply for Access" screen that calls `requestApproval`; (b) pending → "Pending Approval" holding screen; (c) approved → normal app flow (ProfileSetupModal if new, then Dashboard).
-- Ensure pending access requests submitted by new users appear in the existing `AdminPanel.tsx` approval list and that approving them sets their status to approved.
+- Before showing the ProfileSetupModal, check the backend for an existing profile for the authenticated user.
+- If a profile already exists, skip the ProfileSetupModal and navigate directly to the dashboard.
+- If no profile exists, continue showing the ProfileSetupModal as before (new user flow unchanged).
+- Block non-admin users from triggering profile creation if they already have a profile, and show a user-facing message (e.g., "You already have a profile") instead of a silent failure.
+- Preserve admin users' ability to create or update profiles via the AdminPanel without restriction.
 
-**User-visible outcome:** A non-admin user who logs in for the first time can apply for access, sees a pending screen while awaiting approval, and is granted entry to the app once an administrator approves their request in the existing Admin Panel.
+**User-visible outcome:** Pre-existing users who log in are taken straight to the dashboard without seeing the ProfileSetupModal or encountering a silent error. New users still go through the profile setup flow normally. Non-admin users with an existing profile see a clear message if a re-registration is attempted.

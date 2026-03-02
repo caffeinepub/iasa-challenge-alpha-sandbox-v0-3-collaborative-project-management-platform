@@ -1,44 +1,53 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix non-admin onboarding: Apply → Admin Approves → Member Accesses",
+  "title": "Fix profile setup flow for pre-existing users",
   "requirements": [
     {
       "id": "REQ-2",
-      "summary": "Implement three-step non-admin onboarding gate in MainApp.tsx: show 'Apply for Access' screen for new users, 'Pending Approval' holding screen for submitted requests, and normal app flow for approved members",
+      "summary": "Check for existing profile before showing ProfileSetupModal and skip modal for pre-existing users",
       "acceptanceCriteria": [
-        "A first-time authenticated non-admin user sees an 'Apply for Access' screen with a submit button.",
-        "After submitting an access request, the user is immediately shown a 'Pending Approval' holding screen.",
-        "An approved member is routed directly into the app (ProfileSetupModal if new, then Dashboard).",
-        "Administrator users are not affected — their flow is unchanged.",
-        "LoginScreen, Dashboard, AdminPanel, and all other components are not modified."
+        "When a pre-existing user logs in, the ProfileSetupModal is NOT shown.",
+        "The app detects the existing profile and proceeds directly to the dashboard.",
+        "No silent failure or unhandled '!User already exists' error occurs for pre-existing users.",
+        "New users (no existing profile) still see the ProfileSetupModal as before."
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/MainApp.tsx",
           "operation": "modify",
-          "description": "After authentication and admin check, query getCurrentUserStatus() to determine the user's approval state. Route non-admin users based on status: (a) 'unapproved' → render ApplyForAccessScreen inline component with a button that calls requestApproval() mutation, then refetch status; (b) 'pending' → render PendingApprovalScreen inline component displaying a holding message with no actions; (c) 'approved' → proceed to existing ProfileSetupModal check and Dashboard flow. Keep the admin flow (isCallerAdmin check) completely unchanged. Do not modify any other component imports or rendering logic for LoginScreen, Dashboard, or AdminPanel."
+          "description": "Update the profile existence check logic to use doesCallerUserProfileExist() instead of checking if userProfile is null. Change the showProfileSetup condition from 'isAuthenticated && !profileLoading && isFetched && userProfile === null' to 'isAuthenticated && !profileLoading && profileExists === false', ensuring the modal only appears when the backend confirms no profile exists. This prevents showing the modal to users who already have profiles."
         },
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add useGetCurrentUserStatus query hook that calls actor.getCurrentUserStatus() and returns the Variant_unapproved_admin_pending_approved enum. Add useRequestApproval mutation hook that calls actor.requestApproval() and invalidates the 'currentUserStatus' query key on success. Ensure both hooks follow the existing pattern (enabled when actor is available, proper error handling)."
+          "description": "Add a new query hook useDoesCallerUserProfileExist that calls actor.doesCallerUserProfileExist() and returns a boolean indicating profile existence. This query should be enabled when the actor is available and not fetching, with retry disabled. Use the same loading state pattern as useGetCallerUserProfile to properly reflect actor dependency and prevent flash states."
+        },
+        {
+          "path": "frontend/src/components/ProfileSetupModal.tsx",
+          "operation": "modify",
+          "description": "Update error handling in the registerUser mutation's onError handler to catch and display a user-friendly message when the backend returns 'User already exists' or similar registration errors. Show a toast notification explaining that the user already has a profile and redirect them to the dashboard instead of silently failing."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Verify AdminPanel approval section surfaces pending access requests from REQ-2 and that approving them sets status to approved",
+      "summary": "Ensure only administrators can create profiles for existing users and prevent regular users from re-registering",
       "acceptanceCriteria": [
-        "Pending access requests from new users appear in the AdminPanel approval list.",
-        "Approving a request in the AdminPanel allows that user to enter the app on their next access.",
-        "AdminPanel layout and all other admin functionality remain unchanged."
+        "Admin users can still create or update profiles for existing users via the AdminPanel.",
+        "Non-admin users cannot trigger a new profile registration if a profile already exists for their principal.",
+        "Attempting to register an already-existing user as a non-admin results in an appropriate user-facing message (e.g., 'You already have a profile') rather than a silent failure."
       ],
       "file_operations": [
         {
+          "path": "frontend/src/components/ProfileSetupModal.tsx",
+          "operation": "modify",
+          "description": "Add a guard in the handleSubmit function that checks profile existence using the new useDoesCallerUserProfileExist hook before allowing registration submission. If a profile already exists and the user attempts to register, show an error toast with the message 'You already have a profile' and close the modal, preventing duplicate registration attempts by non-admin users."
+        },
+        {
           "path": "frontend/src/components/AdminPanel.tsx",
           "operation": "modify",
-          "description": "Review the existing approval section to confirm it already uses useListApprovals and useSetApproval hooks from useQueries.ts. Verify that pending requests submitted via requestApproval() appear in the list and that calling setApproval(user, 'approved') correctly updates the user's status. If the UI does not clearly indicate the approved status change, add a toast notification on successful approval. Do not restructure the component or modify the user management section."
+          "description": "Verify that the AdminPanel retains its ability to call saveUserProfileAsAdmin for existing users without restrictions. Ensure admin users can update participation levels and profiles for any user regardless of existing profile status. No changes to conditional rendering logic or admin-only guards are needed; this operation confirms that admin profile management capabilities remain unrestricted."
         }
       ]
     }

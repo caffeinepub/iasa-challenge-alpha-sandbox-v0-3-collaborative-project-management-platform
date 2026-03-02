@@ -135,15 +135,14 @@ export interface _SERVICE {
     [bigint, string, string, number, Array<bigint>],
     bigint
   >,
+  'doesCallerUserProfileExist' : ActorMethod<[], boolean>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getChallenges' : ActorMethod<[bigint], Array<Challenge>>,
   'getCurrentUserStatus' : ActorMethod<
     [],
-    { 'unapproved' : null } |
-      { 'admin' : null } |
-      { 'pending' : null } |
-      { 'approved' : null }
+    { 'admin' : null } |
+      { 'regular' : null }
   >,
   'getPeerRatings' : ActorMethod<[bigint], Array<PeerRating>>,
   'getPledges' : ActorMethod<[bigint], Array<Pledge>>,
@@ -164,6 +163,7 @@ export interface _SERVICE {
   >,
   'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'saveUserProfileAsAdmin' : ActorMethod<[Principal, UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
   'setParticipationLevel' : ActorMethod<[ParticipationLevel], undefined>,
   'updateParticipationLevel' : ActorMethod<

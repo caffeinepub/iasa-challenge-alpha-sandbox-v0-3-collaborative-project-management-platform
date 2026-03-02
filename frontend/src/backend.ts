@@ -213,16 +213,14 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
+export enum Variant_admin_regular {
+    admin = "admin",
+    regular = "regular"
+}
 export enum Variant_finalPrize_challenge_taskProposal {
     finalPrize = "finalPrize",
     challenge = "challenge",
     taskProposal = "taskProposal"
-}
-export enum Variant_unapproved_admin_pending_approved {
-    unapproved = "unapproved",
-    admin = "admin",
-    pending = "pending",
-    approved = "approved"
 }
 export interface backendInterface {
     acceptTask(taskId: bigint): Promise<void>;
@@ -236,10 +234,11 @@ export interface backendInterface {
     confirmTask(taskId: bigint): Promise<void>;
     createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null, otherTasksPoolHH: number): Promise<bigint>;
     createTask(projectId: bigint, title: string, description: string, hhBudget: number, dependencies: Array<bigint>): Promise<bigint>;
+    doesCallerUserProfileExist(): Promise<boolean>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getChallenges(taskId: bigint): Promise<Array<Challenge>>;
-    getCurrentUserStatus(): Promise<Variant_unapproved_admin_pending_approved>;
+    getCurrentUserStatus(): Promise<Variant_admin_regular>;
     getPeerRatings(projectId: bigint): Promise<Array<PeerRating>>;
     getPledges(projectId: bigint): Promise<Array<Pledge>>;
     getProjects(): Promise<Array<Project>>;
@@ -256,6 +255,7 @@ export interface backendInterface {
     registerUser(username: string, role: SquadRole, participationLevel: ParticipationLevel): Promise<void>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    saveUserProfileAsAdmin(user: Principal, profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     setParticipationLevel(level: ParticipationLevel): Promise<void>;
     updateParticipationLevel(user: Principal, level: ParticipationLevel): Promise<void>;
@@ -418,6 +418,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async doesCallerUserProfileExist(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.doesCallerUserProfileExist();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.doesCallerUserProfileExist();
+            return result;
+        }
+    }
     async getCallerUserProfile(): Promise<UserProfile | null> {
         if (this.processError) {
             try {
@@ -460,7 +474,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getCurrentUserStatus(): Promise<Variant_unapproved_admin_pending_approved> {
+    async getCurrentUserStatus(): Promise<Variant_admin_regular> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCurrentUserStatus();
@@ -695,6 +709,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n49(this._uploadFile, this._downloadFile, arg0));
+            return result;
+        }
+    }
+    async saveUserProfileAsAdmin(arg0: Principal, arg1: UserProfile): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveUserProfileAsAdmin(arg0, to_candid_UserProfile_n49(this._uploadFile, this._downloadFile, arg1));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveUserProfileAsAdmin(arg0, to_candid_UserProfile_n49(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
@@ -1010,15 +1038,11 @@ function from_candid_variant_n12(_uploadFile: (file: ExternalBlob) => Promise<Ui
     return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
 }
 function from_candid_variant_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    unapproved: null;
-} | {
     admin: null;
 } | {
-    pending: null;
-} | {
-    approved: null;
-}): Variant_unapproved_admin_pending_approved {
-    return "unapproved" in value ? Variant_unapproved_admin_pending_approved.unapproved : "admin" in value ? Variant_unapproved_admin_pending_approved.admin : "pending" in value ? Variant_unapproved_admin_pending_approved.pending : "approved" in value ? Variant_unapproved_admin_pending_approved.approved : value;
+    regular: null;
+}): Variant_admin_regular {
+    return "admin" in value ? Variant_admin_regular.admin : "regular" in value ? Variant_admin_regular.regular : value;
 }
 function from_candid_variant_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     expired: null;

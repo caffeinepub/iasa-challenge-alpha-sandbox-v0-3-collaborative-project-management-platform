@@ -131,16 +131,14 @@ export enum UserRole {
     user = "user",
     guest = "guest"
 }
+export enum Variant_admin_regular {
+    admin = "admin",
+    regular = "regular"
+}
 export enum Variant_finalPrize_challenge_taskProposal {
     finalPrize = "finalPrize",
     challenge = "challenge",
     taskProposal = "taskProposal"
-}
-export enum Variant_unapproved_admin_pending_approved {
-    unapproved = "unapproved",
-    admin = "admin",
-    pending = "pending",
-    approved = "approved"
 }
 export interface backendInterface {
     acceptTask(taskId: bigint): Promise<void>;
@@ -154,10 +152,11 @@ export interface backendInterface {
     confirmTask(taskId: bigint): Promise<void>;
     createProject(title: string, description: string, estimatedTotalHH: number, finalMonetaryValue: number, sharedResourceLink: string | null, otherTasksPoolHH: number): Promise<bigint>;
     createTask(projectId: bigint, title: string, description: string, hhBudget: number, dependencies: Array<bigint>): Promise<bigint>;
+    doesCallerUserProfileExist(): Promise<boolean>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getChallenges(taskId: bigint): Promise<Array<Challenge>>;
-    getCurrentUserStatus(): Promise<Variant_unapproved_admin_pending_approved>;
+    getCurrentUserStatus(): Promise<Variant_admin_regular>;
     getPeerRatings(projectId: bigint): Promise<Array<PeerRating>>;
     getPledges(projectId: bigint): Promise<Array<Pledge>>;
     getProjects(): Promise<Array<Project>>;
@@ -174,6 +173,7 @@ export interface backendInterface {
     registerUser(username: string, role: SquadRole, participationLevel: ParticipationLevel): Promise<void>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    saveUserProfileAsAdmin(user: Principal, profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     setParticipationLevel(level: ParticipationLevel): Promise<void>;
     updateParticipationLevel(user: Principal, level: ParticipationLevel): Promise<void>;

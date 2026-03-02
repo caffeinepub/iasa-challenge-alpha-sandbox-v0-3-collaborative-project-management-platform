@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useRegisterUser } from '../hooks/useQueries';
+import { useRegisterUser, useDoesCallerUserProfileExist } from '../hooks/useQueries';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,6 +79,7 @@ export default function ProfileSetupModal() {
   const [selectedLevel, setSelectedLevel] = useState<ParticipationLevel | null>(null);
   const [squadRole, setSquadRole] = useState<SquadRole | null>(null);
   const registerUser = useRegisterUser();
+  const { data: profileExists } = useDoesCallerUserProfileExist();
 
   const handleLevelSelect = (level: ParticipationLevel) => {
     setSelectedLevel(level);
@@ -90,6 +91,12 @@ export default function ProfileSetupModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Guard: if profile already exists (race condition or stale state), close gracefully
+    if (profileExists === true) {
+      toast.info('You already have a profile. Redirecting to dashboard...');
+      return;
+    }
 
     if (!username.trim()) {
       toast.error('Please enter a username');
@@ -114,7 +121,19 @@ export default function ProfileSetupModal() {
       });
       toast.success('Profile created successfully!');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create profile');
+      const message: string = error?.message ?? '';
+      // Handle the case where the user already has a profile (e.g. registered in another tab)
+      if (
+        message.includes('already registered') ||
+        message.includes('already exists') ||
+        message.includes('User already')
+      ) {
+        toast.info('Your profile already exists. Welcome back!');
+        // Invalidation is handled by the mutation's onSuccess; the modal will close
+        // once doesCallerUserProfileExist re-fetches and returns true.
+      } else {
+        toast.error(message || 'Failed to create profile');
+      }
     }
   };
 

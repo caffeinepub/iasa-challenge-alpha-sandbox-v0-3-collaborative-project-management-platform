@@ -2,10 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-in-mainapp-tsx-implement-the-three-step-non-admin-onboarding-gate-after-a-user-authenticates-via-internet-identity-and-is-confirmed-to-be-non-admin-query-their-approval-status-and-route-them-as-follows-a-status-no-record-show-apply-for-access-screen-where-the-user-can-submit-an-access-request-calling-the-existing-requestapproval-backend-method-b-status-pending-show-a-your-request-is-pending-administrator-approval-holding-screen-with-no-further-actions-c-status-approved-proceed-into-the-normal-app-flow-profilesetupmodal-if-new-then-dashboard-do-not-alter-the-admin-flow-loginscreen-dashboard-or-any-other-component",
-      "featureTitle": "In MainApp.tsx, implement the three-step non-admin onboarding gate. After a user authenticates via Internet Identity and is confirmed to be non-admin, query their approval status and route them as follows: (a) Status = no record → show 'Apply for Access' screen where the user can submit an access request (calling the existing requestApproval backend method); (b) Status = pending → show a 'Your request is pending administrator approval' holding screen with no further actions; (c) Status = approved → proceed into the normal app flow (ProfileSetupModal if new, then Dashboard). Do not alter the admin flow, LoginScreen, Dashboard, or any other component.",
+      "featureId": "feature-in-the-profile-setup-flow-before-attempting-to-register-a-new-user-check-whether-the-authenticated-user-already-has-an-existing-profile-in-the-backend-if-a-profile-already-exists-skip-the-profilesetupmodal-entirely-and-proceed-directly-to-the-main-app-experience-without-showing-an-error-or-doing-nothing-silently",
+      "featureTitle": "In the profile setup flow, before attempting to register a new user, check whether the authenticated user already has an existing profile in the backend. If a profile already exists, skip the ProfileSetupModal entirely and proceed directly to the main app experience without showing an error or doing nothing silently.",
       "files": [
         "frontend/src/components/MainApp.tsx",
+        "frontend/src/components/ProfileSetupModal.tsx",
         "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
@@ -19,6 +20,26 @@
       ],
       "testIds": [
         "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-ensure-that-only-administrators-can-create-a-new-profile-for-an-existing-user-regular-users-must-not-be-able-to-trigger-a-profile-creation-or-re-registration-if-they-already-have-a-profile-the-adminpanel-s-ability-to-manage-create-user-profiles-must-remain-unrestricted-for-admin-users",
+      "featureTitle": "Ensure that only administrators can create a new profile for an existing user. Regular users must not be able to trigger a profile creation or re-registration if they already have a profile. The AdminPanel's ability to manage/create user profiles must remain unrestricted for admin users.",
+      "files": [
+        "frontend/src/components/ProfileSetupModal.tsx"
+      ],
+      "components": [
+        "authorization@1.0.1",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0",
+        "user-approval@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
       ],
       "confidence": "high"
     }

@@ -1,83 +1,58 @@
 {
   "kind": "build_request",
-  "title": "Fix non-admin onboarding: Apply → Admin Approves → Member Accesses",
-  "projectName": "IASA Challenge",
-  "priority": "high",
+  "title": "Fix profile setup flow for pre-existing users",
+  "priority": "normal",
   "requirements": [
     {
-      "id": "REQ-1",
-      "text": "In the backend (main.mo), ensure the access-check logic for non-administrator principals follows this exact sequence: (a) if the caller is the hardcoded admin principal (jv@grupoiasa.cl), grant full access immediately; (b) if the caller has a pending approval request, return a 'pending' status; (c) if the caller has been approved by the administrator, grant member access; (d) if the caller has no record at all, return an 'unapproved/no-request' status. Do not alter any admin-gated operations or existing data structures; only repair the status-resolution logic so approved members are correctly recognized.",
-      "target": "backend",
-      "source": {
-        "messageIds": [
-          "msg-8"
-        ],
-        "quotes": [
-          "fix the problem of access for non-administrator users",
-          "once approved by the administrator, other Members get Access with their internet identity",
-          "DO NOT CHANGE ANYTHING ELSE, INSIDE THE APP OR WITH RESPECT TO THE ADMINISTRATOR ACCESS"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Administrator principal (jv@grupoiasa.cl) retains full admin access unchanged.",
-        "A principal with no record receives a status indicating they must apply for access.",
-        "A principal with a pending request receives a status indicating approval is pending.",
-        "A principal whose request has been approved by the administrator receives full member access.",
-        "No existing backend data structures, admin operations, or other logic are modified."
-      ]
-    },
-    {
       "id": "REQ-2",
-      "text": "In MainApp.tsx, implement the three-step non-admin onboarding gate. After a user authenticates via Internet Identity and is confirmed to be non-admin, query their approval status and route them as follows: (a) Status = no record → show 'Apply for Access' screen where the user can submit an access request (calling the existing requestApproval backend method); (b) Status = pending → show a 'Your request is pending administrator approval' holding screen with no further actions; (c) Status = approved → proceed into the normal app flow (ProfileSetupModal if new, then Dashboard). Do not alter the admin flow, LoginScreen, Dashboard, or any other component.",
-      "target": "frontend",
+      "text": "In the profile setup flow, before attempting to register a new user, check whether the authenticated user already has an existing profile in the backend. If a profile already exists, skip the ProfileSetupModal entirely and proceed directly to the main app experience without showing an error or doing nothing silently.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-8"
+          "msg-recent"
         ],
         "quotes": [
-          "generate a logical on-boarding sequence: 1) Apply for access; 2) Administrator approves access (in the adminnistrator panel, which already exists), 3) once approved by the administrator, other Members get Access",
-          "DO NOT CHANGE ANYTHING ELSE, INSIDE THE APP OR WITH RESPECT TO THE ADMINISTRATOR ACCESS"
+          "the latest draft asks the user to set up his/her profile, then does not react when the user is pre-existing",
+          "!User already exists, this should be avoided"
         ]
       },
       "acceptanceCriteria": [
-        "A first-time authenticated non-admin user sees an 'Apply for Access' screen with a submit button.",
-        "After submitting an access request, the user is immediately shown a 'Pending Approval' holding screen.",
-        "An approved member is routed directly into the app (ProfileSetupModal if new, then Dashboard).",
-        "Administrator users are not affected — their flow is unchanged.",
-        "LoginScreen, Dashboard, AdminPanel, and all other components are not modified."
+        "When a pre-existing user logs in, the ProfileSetupModal is NOT shown.",
+        "The app detects the existing profile and proceeds directly to the dashboard.",
+        "No silent failure or unhandled '!User already exists' error occurs for pre-existing users.",
+        "New users (no existing profile) still see the ProfileSetupModal as before."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "In the existing AdminPanel.tsx approval section, ensure that pending access requests submitted by non-admin users via REQ-2 appear in the approval list and that approving them correctly sets their status to approved (allowing entry per REQ-1/REQ-2). This must use the existing approval infrastructure already present in AdminPanel.tsx and useQueries.ts without restructuring those components.",
-      "target": "frontend",
+      "text": "Ensure that only administrators can create a new profile for an existing user. Regular users must not be able to trigger a profile creation or re-registration if they already have a profile. The AdminPanel's ability to manage/create user profiles must remain unrestricted for admin users.",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-8"
+          "msg-recent"
         ],
         "quotes": [
-          "Administrator approves access (in the adminnistrator panel, which already exists)"
+          "while the administrator is allowed to set up a new profile",
+          "this should be avoided"
         ]
       },
       "acceptanceCriteria": [
-        "Pending access requests from new users appear in the AdminPanel approval list.",
-        "Approving a request in the AdminPanel allows that user to enter the app on their next access.",
-        "AdminPanel layout and all other admin functionality remain unchanged."
+        "Admin users can still create or update profiles for existing users via the AdminPanel.",
+        "Non-admin users cannot trigger a new profile registration if a profile already exists for their principal.",
+        "Attempting to register an already-existing user as a non-admin results in an appropriate user-facing message (e.g., 'You already have a profile') rather than a silent failure."
       ]
     }
   ],
   "constraints": [
-    "Do not change administrator access logic or the admin principal check for jv@grupoiasa.cl.",
-    "Do not modify LoginScreen, Dashboard, AdminPanel structure, Header, Footer, or any component other than MainApp.tsx (and backend access-check logic).",
-    "Do not alter existing backend data structures, stable variables, or any admin-gated operations.",
-    "Do not touch any immutable frontend paths (hooks, main.tsx, ui components).",
-    "Base all changes on the Version 17 codebase."
+    "Do not alter the AdminPanel component or its conditional rendering logic.",
+    "Do not remove or modify the ProfileSetupModal for new users — it must still function correctly for users without an existing profile.",
+    "Preserve all existing features from Version 25."
   ],
   "nonGoals": [
-    "Changing the visual design or theme of any existing screen.",
-    "Adding new admin panel features beyond surfacing pending requests.",
-    "Modifying project, task, pledge, peer rating, or reputation logic.",
-    "Changing how the administrator (jv@grupoiasa.cl) logs in or accesses the app."
+    "Redesigning the profile setup UI.",
+    "Adding new profile fields or changing the registration form.",
+    "Modifying the Decision Log feature.",
+    "Any changes to Header, Footer, or Dashboard components."
   ],
   "imageRequirements": {
     "required": [],

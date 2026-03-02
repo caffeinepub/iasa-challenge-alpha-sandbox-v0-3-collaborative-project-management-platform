@@ -161,19 +161,13 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'doesCallerUserProfileExist' : IDL.Func([], [IDL.Bool], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getChallenges' : IDL.Func([IDL.Nat], [IDL.Vec(Challenge)], ['query']),
   'getCurrentUserStatus' : IDL.Func(
       [],
-      [
-        IDL.Variant({
-          'unapproved' : IDL.Null,
-          'admin' : IDL.Null,
-          'pending' : IDL.Null,
-          'approved' : IDL.Null,
-        }),
-      ],
+      [IDL.Variant({ 'admin' : IDL.Null, 'regular' : IDL.Null })],
       ['query'],
     ),
   'getPeerRatings' : IDL.Func([IDL.Nat], [IDL.Vec(PeerRating)], ['query']),
@@ -196,6 +190,7 @@ export const idlService = IDL.Service({
   'registerUser' : IDL.Func([IDL.Text, SquadRole, ParticipationLevel], [], []),
   'requestApproval' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'saveUserProfileAsAdmin' : IDL.Func([IDL.Principal, UserProfile], [], []),
   'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
   'setParticipationLevel' : IDL.Func([ParticipationLevel], [], []),
   'updateParticipationLevel' : IDL.Func(
@@ -373,19 +368,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'doesCallerUserProfileExist' : IDL.Func([], [IDL.Bool], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getChallenges' : IDL.Func([IDL.Nat], [IDL.Vec(Challenge)], ['query']),
     'getCurrentUserStatus' : IDL.Func(
         [],
-        [
-          IDL.Variant({
-            'unapproved' : IDL.Null,
-            'admin' : IDL.Null,
-            'pending' : IDL.Null,
-            'approved' : IDL.Null,
-          }),
-        ],
+        [IDL.Variant({ 'admin' : IDL.Null, 'regular' : IDL.Null })],
         ['query'],
       ),
     'getPeerRatings' : IDL.Func([IDL.Nat], [IDL.Vec(PeerRating)], ['query']),
@@ -412,6 +401,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'requestApproval' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'saveUserProfileAsAdmin' : IDL.Func([IDL.Principal, UserProfile], [], []),
     'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
     'setParticipationLevel' : IDL.Func([ParticipationLevel], [], []),
     'updateParticipationLevel' : IDL.Func(

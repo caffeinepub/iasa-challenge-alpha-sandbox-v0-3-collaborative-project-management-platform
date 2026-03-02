@@ -1,43 +1,41 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-28T16:15:08.391Z",
+  "generatedAt": "2026-03-02T08:04:11.846Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 1,
+    "total": 2,
+    "implemented": 2,
     "items": [
       {
-        "id": "REQ-1",
-        "summary": "In the backend (main.mo), ensure the access-check logic for non-administrator principals follows this exact sequence: (a) if the caller is the hardcoded admin principal (jv@grupoiasa.cl), grant full access immediately; (b) if the caller has a pending approval request, return a 'pending' status; (c) if the caller has been approved by the administrator, grant member access; (d) if the caller has no record at all, return an 'unapproved/no-request' status. Do not alter any admin-gated operations or existing data structures; only repair the status-resolution logic so approved members are correctly recognized.",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
-      },
-      {
         "id": "REQ-2",
-        "summary": "In MainApp.tsx, implement the three-step non-admin onboarding gate. After a user authenticates via Internet Identity and is confirmed to be non-admin, query their approval status and route them as follows: (a) Status = no record → show 'Apply for Access' screen where the user can submit an access request (calling the existing requestApproval backend method); (b) Status = pending → show a 'Your request is pending administrator approval' holding screen with no further actions; (c) Status = approved → proceed into the normal app flow (ProfileSetupModal if new, then Dashboard). Do not alter the admin flow, LoginScreen, Dashboard, or any other component.",
+        "summary": "In the profile setup flow, before attempting to register a new user, check whether the authenticated user already has an existing profile in the backend. If a profile already exists, skip the ProfileSetupModal entirely and proceed directly to the main app experience without showing an error or doing nothing silently.",
         "status": "implemented",
         "plannedFiles": [
           "frontend/src/components/MainApp.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/ProfileSetupModal.tsx"
         ],
         "matchedFiles": [
           "frontend/src/components/MainApp.tsx",
-          "frontend/src/hooks/useQueries.ts"
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/ProfileSetupModal.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "In the existing AdminPanel.tsx approval section, ensure that pending access requests submitted by non-admin users via REQ-2 appear in the approval list and that approving them correctly sets their status to approved (allowing entry per REQ-1/REQ-2). This must use the existing approval infrastructure already present in AdminPanel.tsx and useQueries.ts without restructuring those components.",
-        "status": "missing",
+        "summary": "Ensure that only administrators can create a new profile for an existing user. Regular users must not be able to trigger a profile creation or re-registration if they already have a profile. The AdminPanel's ability to manage/create user profiles must remain unrestricted for admin users.",
+        "status": "implemented",
         "plannedFiles": [
+          "frontend/src/components/ProfileSetupModal.tsx",
           "frontend/src/components/AdminPanel.tsx"
         ],
-        "matchedFiles": []
+        "matchedFiles": [
+          "frontend/src/components/ProfileSetupModal.tsx"
+        ]
       }
     ]
   },
@@ -50,6 +48,7 @@
     "frontend/src/backend.d.ts",
     "frontend/src/backend.ts",
     "frontend/src/components/MainApp.tsx",
+    "frontend/src/components/ProfileSetupModal.tsx",
     "frontend/src/declarations/backend.did.d.ts",
     "frontend/src/declarations/backend.did.js",
     "frontend/src/hooks/useQueries.ts",

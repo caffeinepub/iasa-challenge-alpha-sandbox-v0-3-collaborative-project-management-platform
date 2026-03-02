@@ -11,17 +11,21 @@ import type {
   ParticipationLevel,
   UserApprovalInfo,
 } from "../backend";
-import { PledgeStatus, ApprovalStatus, Variant_unapproved_admin_pending_approved } from "../backend";
+import { PledgeStatus, ApprovalStatus, Variant_admin_regular } from "../backend";
 import type { Principal } from "@icp-sdk/core/principal";
 
 export function useGetCurrentUserStatus() {
   const { actor, isFetching: actorFetching } = useActor();
 
-  return useQuery<Variant_unapproved_admin_pending_approved>({
+  return useQuery<Variant_admin_regular>({
     queryKey: ["currentUserStatus"],
     queryFn: async () => {
       if (!actor) throw new Error("Actor not available");
-      return actor.getCurrentUserStatus();
+      try {
+        return await actor.getCurrentUserStatus();
+      } catch {
+        return Variant_admin_regular.regular;
+      }
     },
     enabled: !!actor && !actorFetching,
     retry: 2,
@@ -35,8 +39,13 @@ export function useGetCallerUserProfile(enabled = true) {
   const query = useQuery<UserProfile | null>({
     queryKey: ["currentUserProfile"],
     queryFn: async () => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.getCallerUserProfile();
+      if (!actor) return null;
+      try {
+        return await actor.getCallerUserProfile();
+      } catch {
+        // Any error (including "Unauthorized" for brand-new users) means no profile yet
+        return null;
+      }
     },
     enabled: !!actor && !actorFetching && enabled,
     retry: false,
@@ -49,6 +58,36 @@ export function useGetCallerUserProfile(enabled = true) {
   };
 }
 
+/**
+ * Authoritative check for whether the caller has a profile.
+ * Uses doesCallerUserProfileExist() which is a simple boolean query
+ * with no authorization trap — safe for all authenticated users.
+ */
+export function useDoesCallerUserProfileExist() {
+  const { actor, isFetching: actorFetching } = useActor();
+
+  const query = useQuery<boolean>({
+    queryKey: ["doesCallerUserProfileExist"],
+    queryFn: async () => {
+      if (!actor) throw new Error("Actor not available");
+      try {
+        return await actor.doesCallerUserProfileExist();
+      } catch {
+        // On error, assume profile exists to avoid showing setup modal incorrectly
+        return true;
+      }
+    },
+    enabled: !!actor && !actorFetching,
+    retry: false,
+  });
+
+  return {
+    ...query,
+    isLoading: actorFetching || query.isLoading,
+    isFetched: !!actor && query.isFetched,
+  };
+}
+
 export function useGetUserProfile(user: Principal | null) {
   const { actor, isFetching: actorFetching } = useActor();
 
@@ -56,7 +95,11 @@ export function useGetUserProfile(user: Principal | null) {
     queryKey: ["userProfile", user?.toString()],
     queryFn: async () => {
       if (!actor || !user) return null;
-      return actor.getUserProfile(user);
+      try {
+        return await actor.getUserProfile(user);
+      } catch {
+        return null;
+      }
     },
     enabled: !!actor && !actorFetching && !!user,
     retry: false,
@@ -74,6 +117,7 @@ export function useSaveCallerUserProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["doesCallerUserProfileExist"] });
     },
   });
 }
@@ -97,6 +141,8 @@ export function useRegisterUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUserStatus"] });
+      queryClient.invalidateQueries({ queryKey: ["doesCallerUserProfileExist"] });
     },
   });
 }
@@ -487,7 +533,11 @@ export function useListApprovals() {
     queryKey: ["approvals"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listApprovals();
+      try {
+        return await actor.listApprovals();
+      } catch {
+        return [];
+      }
     },
     enabled: !!actor && !actorFetching,
     retry: false,
